@@ -8,6 +8,7 @@ const { libraryClient } = require('./discord-library');
 const branding = require('../branding');
 const album = require('./album');
 const settings = require('./settings');
+const bisect = require('./bisect');
 const log = require('./log');
 
 const TRACK_CHANNEL = 'kotamusic:player:track';
@@ -41,6 +42,22 @@ function basic(activity) {
 function webUrl(relative) {
   if (!relative) return undefined;
   return relative.startsWith('http') ? relative : WEB_BASE + relative;
+}
+
+// Discord считает длину подписи кнопки в байтах, а кириллица весит по два.
+// Слишком длинная подпись делает статус недоступным для рассылки: свой
+// клиент его рисует, другие участники не видят ничего.
+const BUTTON_LABEL_LIMIT = 32;
+
+function label(text) {
+  const bytes = Buffer.byteLength(text, 'utf8');
+  if (bytes <= BUTTON_LABEL_LIMIT) return text;
+
+  log.warn(`Подпись кнопки «${text}» длиннее ${BUTTON_LABEL_LIMIT} байт (${bytes}), обрезаю`);
+
+  let cut = text;
+  while (Buffer.byteLength(cut, 'utf8') > BUTTON_LABEL_LIMIT) cut = cut.slice(0, -1);
+  return cut;
 }
 
 /** Состояние плеера → активность в Discord. */
@@ -152,8 +169,8 @@ function buildActivity() {
 
     // В режиме «Моей волны» ссылки на трек нет — тогда ведём к исполнителю.
     const listenUrl = track.trackUrl || track.artistUrl;
-    if (listenUrl) buttons.push({ label: 'Открыть в Яндекс Музыке', url: listenUrl });
-    if (branding.authorUrl) buttons.push({ label: 'Автор', url: branding.authorUrl });
+    if (listenUrl) buttons.push({ label: label('Слушать'), url: listenUrl });
+    if (branding.authorUrl) buttons.push({ label: label('Harrisan'), url: branding.authorUrl });
 
     if (buttons.length) activity.buttons = buttons;
   }
@@ -164,7 +181,8 @@ function buildActivity() {
 function sync() {
   if (!rpc?.connected) return;
 
-  const activity = settings.get().authorStyle ? buildAuthorStyle() : buildActivity();
+  let activity = settings.get().authorStyle ? buildAuthorStyle() : buildActivity();
+  if (activity && settings.get().bisect) activity = bisect.decorate(activity, { branding });
 
   // Между треками плеер на мгновение перестаёт «играть». Снимать статус
   // сразу нельзя — он будет мигать на каждом переходе. Ждём выдержку
@@ -277,6 +295,16 @@ async function connect() {
 }
 
 function start() {
+  // Разбор: каждые 40 секунд переходим к следующему варианту кадра.
+  if (settings.get().bisect) {
+    setInterval(() => {
+      const variant = bisect.next();
+      log.info(`Вариант #${variant.id}: ${variant.name}`);
+      lastSent = '';
+      sync();
+    }, 40000);
+  }
+
   log.setVerbose(settings.get().debug);
   settings.onChange((now) => log.setVerbose(now.debug));
 
