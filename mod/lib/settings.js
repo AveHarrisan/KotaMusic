@@ -33,8 +33,11 @@ const DEFAULTS = {
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
 
+  // Перебор вариантов кадра ради поиска мешающего поля.
+  bisect: false,
+
   // Собирать статус в точности как старый мод — для сравнения.
-  authorStyle: true,
+  authorStyle: false,
 
   // Чем отправлять статус: своим клиентом или библиотекой старого мода.
   // Переключатель нужен, пока выясняем, почему статус не рассылается.
