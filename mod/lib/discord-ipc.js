@@ -42,9 +42,10 @@ function encode(op, payload) {
 }
 
 class DiscordIPC extends EventEmitter {
-  constructor(clientId) {
+  constructor(clientId, onFrame) {
     super();
     this.clientId = clientId;
+    this.onFrame = onFrame; // для сверки того, что реально уходит в сокет
     this.socket = null;
     this.connected = false;
     this.buffer = Buffer.alloc(0);
@@ -85,9 +86,15 @@ class DiscordIPC extends EventEmitter {
 
         this.once('ready', () => resolve());
         this.once('handshake-error', reject);
-        socket.write(encode(OP.HANDSHAKE, { v: 1, client_id: this.clientId }));
+        this.write(OP.HANDSHAKE, { v: 1, client_id: this.clientId });
       });
     });
+  }
+
+  /** Единственное место записи — чтобы всё уходящее было видно в журнале. */
+  write(op, payload) {
+    this.onFrame?.(op, payload);
+    this.socket.write(encode(op, payload));
   }
 
   #onData(chunk) {
@@ -102,7 +109,7 @@ class DiscordIPC extends EventEmitter {
       this.buffer = this.buffer.subarray(8 + len);
 
       if (op === OP.PING) {
-        this.socket.write(encode(OP.PONG, payload));
+        this.write(OP.PONG, payload);
         continue;
       }
       if (op === OP.CLOSE) {
@@ -121,26 +128,22 @@ class DiscordIPC extends EventEmitter {
 
   setActivity(activity) {
     if (!this.connected) return false;
-    this.socket.write(
-      encode(OP.FRAME, {
-        cmd: 'SET_ACTIVITY',
-        args: { pid: process.pid, activity },
-        // Discord ждёт идентификатор запроса именно в формате UUID.
-        nonce: randomUUID(),
-      })
-    );
+    this.write(OP.FRAME, {
+      cmd: 'SET_ACTIVITY',
+      args: { pid: process.pid, activity },
+      // Discord ждёт идентификатор запроса именно в формате UUID.
+      nonce: randomUUID(),
+    });
     return true;
   }
 
   clearActivity() {
     if (!this.connected) return false;
-    this.socket.write(
-      encode(OP.FRAME, {
-        cmd: 'SET_ACTIVITY',
-        args: { pid: process.pid },
-        nonce: randomUUID(),
-      })
-    );
+    this.write(OP.FRAME, {
+      cmd: 'SET_ACTIVITY',
+      args: { pid: process.pid },
+      nonce: randomUUID(),
+    });
     return true;
   }
 
