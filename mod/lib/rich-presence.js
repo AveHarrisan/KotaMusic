@@ -44,6 +44,54 @@ function webUrl(relative) {
 }
 
 /** Состояние плеера → активность в Discord. */
+/**
+ * Статус ровно в том виде, в каком его шлёт старый мод: он доказанно
+ * рассылается другим участникам. Пока идёт сравнение, это отдельный
+ * режим, а не замена нашего.
+ */
+function buildAuthorStyle() {
+  if (!track || !track.isPlaying) return null;
+
+  const artists = track.artists?.length ? track.artists.join(', ') : 'Unknown artist';
+  const fresh = tickState?.title === track.title ? tickState : null;
+  const duration = fresh?.duration ?? track.duration;
+
+  let position = track.position;
+  if (fresh) position = fresh.position + (Date.now() - fresh.at) / 1000;
+
+  const activity = {
+    type: 2,
+    status_display_type: 0,
+    details: track.title.slice(0, 128),
+    state: artists.slice(0, 128),
+    assets: {
+      large_image: track.cover || 'logo',
+      large_text: albumTitle || 'Yandex Music',
+    },
+    instance: false,
+  };
+
+  if (track.trackUrl) activity.details_url = track.trackUrl;
+  if (track.artistUrl) activity.state_url = track.artistUrl;
+
+  if (Number.isFinite(position)) {
+    const now = Date.now();
+    activity.timestamps = { start: Math.round(now - position * 1000) };
+    if (Number.isFinite(duration) && duration > 0) {
+      activity.timestamps.end = Math.round(now + (duration - position) * 1000);
+    }
+  }
+
+  if (track.trackUrl) {
+    activity.buttons = [
+      { label: 'Listen in Yandex Music', url: track.trackUrl },
+      { label: 'Install from GitHub', url: branding.repositoryUrl },
+    ];
+  }
+
+  return activity;
+}
+
 function buildActivity() {
   if (!settings.get().richPresence) return null;
   if (!track || !track.isPlaying) return null;
@@ -116,7 +164,7 @@ function buildActivity() {
 function sync() {
   if (!rpc?.connected) return;
 
-  const activity = buildActivity();
+  const activity = settings.get().authorStyle ? buildAuthorStyle() : buildActivity();
 
   // Между треками плеер на мгновение перестаёт «играть». Снимать статус
   // сразу нельзя — он будет мигать на каждом переходе. Ждём выдержку
@@ -125,7 +173,7 @@ function sync() {
     if (clearTimer) return;
     clearTimer = setTimeout(() => {
       clearTimer = null;
-      if (buildActivity()) return sync(); // музыка вернулась
+      if (settings.get().authorStyle ? buildAuthorStyle() : buildActivity()) return sync(); // музыка вернулась
       if (lastSent === 'null') return;
 
       lastSent = 'null';
