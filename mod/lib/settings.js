@@ -11,7 +11,19 @@ const log = require('./log');
 
 const FILE = 'kotamusic.json';
 
+// Состав статуса, который в проверке 10.09 доходил до других участников.
+// От него отталкиваемся, возвращая остальные возможности по одной.
+const WORKING_PRESET = {
+  progress: 'counter',
+  showTrackInMemberList: false,
+  useLibrary: true,
+};
+
 const DEFAULTS = {
+  // Отметка применённого набора: без неё сохранённые ранее значения
+  // остались бы поверх и проверка была бы нечистой.
+  preset: null,
+
   richPresence: true,
   // 'bar' — полоса с началом и концом (видна в карточке профиля)
   // 'counter' — счётчик времени (виден и в карточке голосового канала)
@@ -20,6 +32,10 @@ const DEFAULTS = {
   showTrackInMemberList: branding.discord.modernFields,
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
+
+  // Чем отправлять статус: своим клиентом или библиотекой старого мода.
+  // Переключатель нужен, пока выясняем, почему статус не рассылается.
+  useLibrary: false,
 
   // Подробный журнал: что уходит в Discord и что он отвечает.
   debug: true,
@@ -39,6 +55,13 @@ function load() {
   } catch (e) {
     log.warn('Настройки повреждены, беру значения по умолчанию:', e.message);
     values = { ...DEFAULTS };
+  }
+
+  // Один раз приводим настройки к проверенному набору.
+  if (values.preset !== 'working-2026-09-10') {
+    values = { ...values, ...WORKING_PRESET, preset: 'working-2026-09-10' };
+    save();
+    log.info('Настройки приведены к проверенному набору');
   }
 
   return values;

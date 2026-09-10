@@ -4,6 +4,7 @@
 const { app, ipcMain } = require('electron');
 
 const { DiscordIPC } = require('./discord-ipc');
+const { libraryClient } = require('./discord-library');
 const branding = require('../branding');
 const album = require('./album');
 const settings = require('./settings');
@@ -179,14 +180,29 @@ async function connect() {
   const clientId = settings.get().discordApplicationId;
   if (!clientId) return log.warn('Rich Presence выключен: не задан идентификатор приложения');
 
-  rpc = new DiscordIPC(clientId);
-  rpc.on('close', () => {
+  const useLibrary = settings.get().useLibrary;
+  log.info(`Отправка ${useLibrary ? 'библиотекой' : 'своим клиентом'}`);
+
+  const client = useLibrary
+    ? libraryClient(clientId, log)
+    : new DiscordIPC(clientId, (op, payload) =>
+        log.debug(`Кадр клиента op=${op}:`, JSON.stringify(payload).slice(0, 500))
+      );
+  rpc = client;
+  client.on('close', () => {
+    // Закрытие уже заменённого соединения нас не касается: иначе на каждую
+    // смену настроек заводился бы лишний клиент, и к Discord подключалось
+    // сразу несколько наших соединений.
+    if (rpc !== client) return;
+
     log.info('Соединение с Discord закрыто');
     lastSent = '';
     scheduleReconnect();
   });
-  rpc.on('error', (e) => log.warn('Ошибка Discord:', e.message));
-  rpc.on('message', (payload) => {
+  client.on('error', (e) => rpc === client && log.warn('Ошибка Discord:', e.message));
+  client.on('message', (payload) => {
+    if (rpc !== client) return;
+
     log.debug('Ответ Discord:', JSON.stringify(payload).slice(0, 400));
     if (payload.evt !== 'ERROR') return;
 
@@ -200,14 +216,14 @@ async function connect() {
   });
 
   try {
-    await rpc.connect();
+    await client.connect();
     log.info(`Discord подключён; приложение ${clientId}`);
     lastSent = '';
     sync();
   } catch (e) {
     log.info('Discord недоступен:', e.message);
-    rpc.destroy();
-    rpc = null;
+    client.destroy();
+    if (rpc === client) rpc = null;
     scheduleReconnect();
   }
 }
@@ -302,11 +318,19 @@ function start() {
 
   // Переключатели в настройках должны действовать сразу.
   settings.onChange((now, before) => {
-    if (now.discordApplicationId !== before.discordApplicationId) {
-      log.info('Сменилось приложение Discord, переподключаюсь');
-      rpc?.destroy();
+    if (
+      now.discordApplicationId !== before.discordApplicationId ||
+      now.useLibrary !== before.useLibrary
+    ) {
+      log.info('Меняю способ отправки, переподключаюсь');
+
+      const previous = rpc;
       rpc = null;
+      previous?.destroy();
+
       lastSent = '';
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
       connect();
       return;
     }

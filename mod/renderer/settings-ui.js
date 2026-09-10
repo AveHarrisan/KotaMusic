@@ -153,6 +153,14 @@ function fill(container) {
 
   container.appendChild(
     row(
+      'Отправка библиотекой',
+      'Временно: сравниваем два способа отправки статуса',
+      toggle(config.useLibrary, (value) => update({ useLibrary: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
       'Подробный журнал',
       'Записывать в файл, что уходит в Discord',
       toggle(config.debug, (value) => update({ debug: value }))
