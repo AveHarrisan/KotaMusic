@@ -33,6 +33,9 @@ const DEFAULTS = {
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
 
+  // Собирать статус в точности как старый мод — для сравнения.
+  authorStyle: true,
+
   // Чем отправлять статус: своим клиентом или библиотекой старого мода.
   // Переключатель нужен, пока выясняем, почему статус не рассылается.
   useLibrary: false,
