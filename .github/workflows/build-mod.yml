@@ -1,0 +1,88 @@
+name: Сборка мода
+
+# Проверяем выход новой версии клиента и собираем мод сами.
+# Файл app.asar одинаков для Windows, macOS и Linux (проверено побайтово),
+# поэтому собираем один раз из самого лёгкого установщика — .deb.
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'mod/**'
+      - 'patches/**'
+      - 'scripts/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.info.outputs.client }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Собрать
+        run: node scripts/build.js --platform=linux
+
+      - id: info
+        name: Прочитать версию клиента
+        run: echo "client=$(node -p "require('./dist/build-info.json').clientVersion")" >> $GITHUB_OUTPUT
+
+      - name: Проверить, что релиз ещё не выложен
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "mod-${{ steps.info.outputs.client }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-asar-${{ steps.info.outputs.client }}
+          path: dist/
+
+      - name: Выложить релиз
+        if: steps.check.outputs.exists == 'false' && github.event_name != 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mod-${{ steps.info.outputs.client }}
+          name: KotaMusic для Яндекс Музыки ${{ steps.info.outputs.client }}
+          body: |
+            Собрано автоматически для клиента **${{ steps.info.outputs.client }}**.
+
+            Ставить через установщик KotaMusic: одной подмены файла мало —
+            Windows и macOS проверяют целостность `app.asar`.
+          files: |
+            dist/app.asar
+            dist/build-info.json
+          fail_on_unmatched_files: true
+
+  # Сборка падает, если врезка не нашла своё место в новом коде клиента.
+  # Тогда заводим задачу вместо тихого пропуска обновления.
+  notify:
+    needs: build
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Завести задачу о поломке
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Патчи не легли на новую версию клиента"
+          if [ -z "$(gh issue list --search "$title in:title" --state open --json number --jq '.[0]')" ]; then
+            gh issue create --title "$title" \
+              --body "Автосборка не смогла наложить врезки. Прогон: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+        working-directory: ${{ github.workspace }}
