@@ -12,6 +12,7 @@ const MARK = 'kotamusic-settings';
 const ANCHOR_TEXT = 'О приложении';
 
 let config = null;
+let defaults = {};
 let meta = { name: 'KotaMusic', version: '' };
 
 const el = (tag, style, text) => {
@@ -121,6 +122,19 @@ function hotkeyField(value, onChange) {
     document.addEventListener('keydown', onKey, true);
   });
 
+  return button;
+}
+
+/** Обычная кнопка действия. */
+function actionButton(label, onClick) {
+  const button = el(
+    'button',
+    'flex:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;' +
+      'color:inherit;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06)'
+  );
+  button.type = 'button';
+  button.textContent = label;
+  button.addEventListener('click', onClick);
   return button;
 }
 
@@ -261,6 +275,18 @@ function fill(container) {
     );
   }
 
+  const isDefault =
+    JSON.stringify(hotkeys) === JSON.stringify(defaults.hotkeys ?? {});
+
+  const reset = actionButton('Вернуть по умолчанию', () =>
+    update({ hotkeys: { ...defaults.hotkeys } })
+  );
+  reset.disabled = isDefault;
+  reset.style.opacity = isDefault ? '.4' : '1';
+  reset.style.cursor = isDefault ? 'default' : 'pointer';
+
+  add(row('Сбросить сочетания', 'Вернуть набор, который идёт с модом', reset));
+
   // --- Клиент ------------------------------------------------------------
 
   add(
@@ -335,6 +361,7 @@ function render() {
 async function start() {
   const state = await ipcRenderer.invoke('kotamusic:settings:get');
   config = state.values;
+  defaults = state.defaults || {};
   meta = { name: state.name, version: state.version };
 
   // Страница настроек — часть одностраничного приложения: она появляется
