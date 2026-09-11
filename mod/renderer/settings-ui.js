@@ -124,6 +124,17 @@ function hotkeyField(value, onChange) {
   return button;
 }
 
+/** Заголовок группы настроек. */
+function group(title) {
+  const node = el(
+    'div',
+    'margin:18px 0 2px;font-size:12px;font-weight:700;letter-spacing:.04em;' +
+      'text-transform:uppercase;opacity:.45'
+  );
+  node.textContent = title;
+  return node;
+}
+
 function row(title, description, control) {
   const wrap = el('div', 'display:flex;align-items:center;gap:16px;padding:12px 0');
   const texts = el('div', 'flex:1;min-width:0');
@@ -153,52 +164,43 @@ function fill(container) {
   header.appendChild(el('div', 'font-size:13px;opacity:.5', meta.version));
   container.appendChild(header);
 
-  container.appendChild(
+  const add = (...nodes) => nodes.forEach((node) => container.appendChild(node));
+
+  // --- Discord -----------------------------------------------------------
+
+  add(
+    group('Discord'),
     row(
-      'Discord Rich Presence',
+      'Rich Presence',
       'Показывать в Discord, что вы слушаете',
       toggle(config.richPresence, (value) => update({ richPresence: value }))
     )
   );
 
   const counter = config.progress === 'counter';
-  container.appendChild(
+  add(
     row(
       'Счётчик времени вместо полосы',
       counter
         ? 'Время видно и в профиле, и в карточке голосового канала'
         : 'Полоса с началом и концом трека — видна только в карточке профиля',
       toggle(counter, (value) => update({ progress: value ? 'counter' : 'bar' }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Время в строке исполнителя',
       'Единственный способ показать секунды при наведении в голосовом канале',
       toggle(config.timeInState, (value) => update({ timeInState: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Название трека в списке участников',
       'Вместо названия приложения',
-      toggle(config.showTrackInMemberList, (value) =>
-        update({ showTrackInMemberList: value })
-      )
-    )
-  );
-
-  container.appendChild(
+      toggle(config.showTrackInMemberList, (value) => update({ showTrackInMemberList: value }))
+    ),
     row(
       'Кнопки под статусом',
       'Переход к треку и к автору мода',
       toggle(config.showButtons, (value) => update({ showButtons: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Показывать альбом',
       'Третьей строкой статуса вместо надписи «Яндекс Музыка»',
@@ -206,79 +208,78 @@ function fill(container) {
     )
   );
 
-  container.appendChild(
+  // --- Мини-плеер --------------------------------------------------------
+
+  add(
+    group('Мини-плеер'),
     row(
-      'Мини-плеер',
+      'Показывать мини-плеер',
       'Маленькое окно поверх других',
       toggle(config.miniplayer, (value) => update({ miniplayer: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
-      'Перемотка в мини-плеере',
+      'Перемотка',
       'Щелчок по полосе задаёт позицию в треке',
       toggle(config.miniplayerSeek, (value) => update({ miniplayerSeek: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
-      'Громкость в мини-плеере',
+      'Громкость',
       'Ползунок рядом с кнопками',
       toggle(config.miniplayerVolume, (value) => update({ miniplayerVolume: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
-      'Кнопка закрытия мини-плеера',
+      'Кнопка закрытия',
       'Крестик в углу окна',
       toggle(config.miniplayerClose, (value) => update({ miniplayerClose: value }))
     )
   );
 
-  container.appendChild(
-    row(
-      'Клавиша мини-плеера',
-      'Нажмите поле и задайте сочетание. Backspace убирает',
-      hotkeyField(config.miniplayerHotkey, (value) => update({ miniplayerHotkey: value }))
-    )
-  );
+  // --- Горячие клавиши ---------------------------------------------------
 
-  container.appendChild(
+  const hotkeys = config.hotkeys || {};
+  const actions = {
+    play: 'Пауза и воспроизведение',
+    next: 'Следующий трек',
+    previous: 'Предыдущий трек',
+    volumeUp: 'Громче',
+    volumeDown: 'Тише',
+    like: 'Лайк',
+    miniplayer: 'Показать мини-плеер',
+  };
+
+  add(group('Горячие клавиши'));
+
+  for (const [action, title] of Object.entries(actions)) {
+    add(
+      row(
+        title,
+        '',
+        hotkeyField(hotkeys[action], (value) =>
+          update({ hotkeys: { ...hotkeys, [action]: value } })
+        )
+      )
+    );
+  }
+
+  // --- Клиент ------------------------------------------------------------
+
+  add(
+    group('Клиент'),
     row(
       'Кнопки на панели задач',
       'Управление из миниатюры окна, только в Windows',
       toggle(config.taskbarButtons, (value) => update({ taskbarButtons: value }))
-    )
-  );
-
-  container.appendChild(
-    row(
-      'Глобальные горячие клавиши',
-      'Ctrl+Alt и пробел, стрелки, L — работают поверх других окон',
-      toggle(config.hotkeys, (value) => update({ hotkeys: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Процент при изменении громкости',
       'Короткая подсказка рядом с ползунком',
       toggle(config.showVolumePercent, (value) => update({ showVolumePercent: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Не гасить экран во время музыки',
       'Пока идёт воспроизведение',
       toggle(config.preventSleep, (value) => update({ preventSleep: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Масштаб интерфейса',
       'В процентах, от 50 до 200',
@@ -286,18 +287,12 @@ function fill(container) {
         const percent = Math.min(200, Math.max(50, Number(value) || 100));
         update({ zoom: percent });
       })
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Папка кеша',
       'Пусто — стандартная. Применяется при следующем запуске',
       textField(config.cacheDir || '', (value) => update({ cacheDir: value }))
-    )
-  );
-
-  container.appendChild(
+    ),
     row(
       'Подробный журнал',
       'Записывать в файл, что уходит в Discord',

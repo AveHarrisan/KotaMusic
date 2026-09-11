@@ -6,15 +6,15 @@ const { app, globalShortcut } = require('electron');
 const settings = require('./settings');
 const log = require('./log');
 
-// Сочетания намеренно с Ctrl+Alt: одиночные мультимедийные клавиши
-// клиент обрабатывает сам, перехватывать их незачем.
-const DEFAULTS = {
-  'Control+Alt+Space': 'play',
-  'Control+Alt+Right': 'next',
-  'Control+Alt+Left': 'previous',
-  'Control+Alt+Up': 'volumeUp',
-  'Control+Alt+Down': 'volumeDown',
-  'Control+Alt+L': 'like',
+// Названия действий для журнала.
+const NAMES = {
+  play: 'пауза и воспроизведение',
+  next: 'следующий трек',
+  previous: 'предыдущий трек',
+  volumeUp: 'громче',
+  volumeDown: 'тише',
+  like: 'лайк',
+  miniplayer: 'мини-плеер',
 };
 
 function send(action) {
@@ -34,16 +34,16 @@ function unregister() {
 function register() {
   unregister();
 
-  // Клавиша мини-плеера задаётся пользователем и по умолчанию пуста,
-  // поэтому живёт отдельно от общего набора.
-  const combinations = { ...(settings.get().hotkeys ? DEFAULTS : {}) };
-  const custom = settings.get().miniplayerHotkey?.trim();
-  if (custom) combinations[custom] = 'miniplayer';
+  // Сочетания задаёт пользователь: пустое значение означает, что
+  // клавиши у действия нет.
+  const combinations = Object.entries(settings.get().hotkeys || {})
+    .map(([action, combination]) => [action, combination?.trim()])
+    .filter(([, combination]) => combination);
 
-  if (!Object.keys(combinations).length) return;
+  if (!combinations.length) return;
 
   const busy = [];
-  for (const [combination, action] of Object.entries(combinations)) {
+  for (const [action, combination] of combinations) {
     // Сочетание может быть занято другой программой — это не ошибка,
     // просто сообщаем и продолжаем.
     let ok = false;
@@ -55,7 +55,7 @@ function register() {
     if (!ok) busy.push(combination);
   }
 
-  const total = Object.keys(combinations).length;
+  const total = combinations.length;
   log.info(`Горячие клавиши: зарегистрировано ${total - busy.length} из ${total}`);
   if (busy.length) log.warn('Сочетания заняты другой программой:', busy.join(', '));
 }
@@ -65,12 +65,10 @@ function start() {
   else app.once('ready', register);
 
   settings.onChange((now, before) => {
-    if (now.hotkeys !== before.hotkeys || now.miniplayerHotkey !== before.miniplayerHotkey) {
-      register();
-    }
+    if (JSON.stringify(now.hotkeys) !== JSON.stringify(before.hotkeys)) register();
   });
 
   app.on('will-quit', unregister);
 }
 
-module.exports = { start, DEFAULTS };
+module.exports = { start, NAMES };
