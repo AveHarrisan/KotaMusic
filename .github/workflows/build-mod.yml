@@ -16,6 +16,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Нужно и для чтения кода, и для создания релиза.
+    permissions:
+      contents: write
+
     outputs:
       client: ${{ steps.info.outputs.client }}
     steps:
@@ -79,10 +84,20 @@ jobs:
       - name: Завести задачу о поломке
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          title="Патчи не легли на новую версию клиента"
-          if [ -z "$(gh issue list --search "$title in:title" --state open --json number --jq '.[0]')" ]; then
-            gh issue create --title "$title" \
-              --body "Автосборка не смогла наложить врезки. Прогон: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="Автосборка мода не прошла"
+
+          # Задача заводится один раз: повторные падения дописывать незачем.
+          existing=$(gh issue list --repo "$REPO" --search "$title in:title" \
+            --state open --json number --jq '.[0].number')
+
+          if [ -z "$existing" ]; then
+            gh issue create --repo "$REPO" --title "$title" \
+              --body "Сборка не удалась. Скорее всего клиент изменился и врезки не легли.
+
+          Прогон: $RUN"
+          else
+            gh issue comment "$existing" --repo "$REPO" --body "Повторилось: $RUN"
           fi
-        working-directory: ${{ github.workspace }}
