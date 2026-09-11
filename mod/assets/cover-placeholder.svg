@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Заглушка обложки: маскот Котамарина -->
+  <rect width="200" height="200" fill="#2a2a2a"/>
+  <g transform="translate(100 108)">
+    <!-- уши -->
+    <path d="M-46-30 L-56-74 L-18-56 Z" fill="#e08a45"/>
+    <path d="M46-30 L56-74 L18-56 Z" fill="#e08a45"/>
+    <path d="M-44-36 L-50-64 L-24-51 Z" fill="#f2b184"/>
+    <path d="M44-36 L50-64 L24-51 Z" fill="#f2b184"/>
+    <!-- морда -->
+    <ellipse cx="0" cy="4" rx="50" ry="45" fill="#e8955a"/>
+    <ellipse cx="0" cy="14" rx="34" ry="27" fill="#f6d0ae"/>
+    <!-- каска -->
+    <path d="M-58-14a58 50 0 0 1 116 0q0 6-6 6h-104q-6 0-6-6z" fill="#4d6b45"/>
+    <path d="M-66-10h132q4 0 4 6t-4 6H-66q-4 0-4-6t4-6z" fill="#3f5a39"/>
+    <!-- глаза -->
+    <ellipse cx="-17" cy="2" rx="8" ry="9" fill="#fff"/>
+    <ellipse cx="17" cy="2" rx="8" ry="9" fill="#fff"/>
+    <ellipse cx="-17" cy="2" rx="4" ry="7" fill="#5f9e3d"/>
+    <ellipse cx="17" cy="2" rx="4" ry="7" fill="#5f9e3d"/>
+    <!-- нос и рот -->
+    <path d="M-5 18h10l-5 6z" fill="#d8746e"/>
+    <path d="M0 24v5M0 29q-6 6-11 0M0 29q6 6 11 0" stroke="#8a5a3c" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- усы -->
+    <g stroke="#f6d0ae" stroke-width="2" stroke-linecap="round">
+      <path d="M-22 24-52 18M-22 29-52 31M22 24 52 18M22 29 52 31"/>
+    </g>
+  </g>
+</svg>

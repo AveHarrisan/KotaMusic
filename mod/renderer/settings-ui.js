@@ -261,6 +261,16 @@ function fill(container) {
       toggle(config.miniplayerClose, (value) => update({ miniplayerClose: value }))
     ),
     row(
+      'Кнопка «!» в окне клиента',
+      'Вызывает мини-плеер на прежнем месте; применяется после перезапуска',
+      toggle(config.miniplayerButton, (value) => update({ miniplayerButton: value }))
+    ),
+    row(
+      'Показать подсказку снова',
+      'Короткое пояснение о кнопке при следующем запуске',
+      toggle(!config.hintShown, (value) => update({ hintShown: !value }))
+    ),
+    row(
       'Компактный вид',
       'Окно ниже: обложка меньше, исполнитель скрыт',
       toggle(config.miniplayerCompact, (value) => update({ miniplayerCompact: value }))

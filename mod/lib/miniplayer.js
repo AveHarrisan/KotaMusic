@@ -26,6 +26,24 @@ let lastPosition = null;
 let unlockTimer = null;
 let unlockUntil = 0;
 
+/** Сохранённое место окна, если оно всё ещё помещается на экране. */
+function savedPosition() {
+  const saved = settings.get().miniplayerPosition;
+  if (!saved || !Number.isFinite(saved.x) || !Number.isFinite(saved.y)) return null;
+
+  // Монитор могли отключить — тогда окно уехало бы за пределы экрана.
+  const visible = screen.getAllDisplays().some(({ workArea }) => {
+    return (
+      saved.x + currentWidth() > workArea.x &&
+      saved.y + currentHeight() > workArea.y &&
+      saved.x < workArea.x + workArea.width &&
+      saved.y < workArea.y + workArea.height
+    );
+  });
+
+  return visible ? saved : null;
+}
+
 /** Правый нижний угол экрана — привычное место для такого окна. */
 function corner() {
   const { workArea } = screen.getPrimaryDisplay();
@@ -42,7 +60,7 @@ const currentHeight = () => (compact() ? COMPACT_HEIGHT : HEIGHT);
 function create() {
   if (window && !window.isDestroyed()) return window;
 
-  const position = corner();
+  const position = savedPosition() || corner();
 
   window = new BrowserWindow({
     width: currentWidth(),
@@ -71,6 +89,18 @@ function create() {
   window.webContents.on('did-finish-load', () => window.webContents.setZoomFactor(1));
   window.loadFile(path.join(__dirname, '..', 'miniplayer', 'index.html'));
 
+  // Запоминаем, куда человек перетащил окно: в следующий раз оно
+  // откроется там же.
+  const remember = () => {
+    if (!alive()) return;
+
+    const [x, y] = window.getPosition();
+    settings.set({ miniplayerPosition: { x, y } });
+  };
+
+  window.on('moved', remember);
+
+  window.on('close', remember);
   window.on('closed', () => {
     window = null;
   });
@@ -183,6 +213,17 @@ function setPosition(tick) {
 function start() {
   ipcMain.on('kotamusic:miniplayer:ready', () => push());
 
+  // Кнопка в заголовке клиента.
+  ipcMain.on('kotamusic:miniplayer:show', () => {
+    if (alive()) {
+      window.show();
+      window.focus();
+      return;
+    }
+
+    settings.set({ miniplayer: true });
+  });
+
   // Закрытие окна — это выключение мини-плеера, чтобы он не возвращался
   // сам при следующем запуске клиента.
   ipcMain.on('kotamusic:miniplayer:close', () => {
@@ -202,9 +243,9 @@ function start() {
     if (now.miniplayer !== before.miniplayer) return now.miniplayer ? show() : hide();
 
     if (now.miniplayerCompact !== before.miniplayerCompact && alive()) {
-      // Размер меняем вместе с местом: окно должно остаться в углу.
-      const position = corner();
-      window.setBounds({ ...position, width: currentWidth(), height: currentHeight() });
+      // Размер меняем, место сохраняем — окно не должно прыгать.
+      const [x, y] = window.getPosition();
+      window.setBounds({ x, y, width: currentWidth(), height: currentHeight() });
     }
 
     if (now.miniplayerLocked !== before.miniplayerLocked) {

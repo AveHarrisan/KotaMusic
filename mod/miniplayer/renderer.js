@@ -6,6 +6,9 @@ const { ipcRenderer } = require('electron');
 
 const el = (id) => document.getElementById(id);
 
+// Когда играть нечего, вместо пустого квадрата показываем маскот.
+const PLACEHOLDER = '../assets/cover-placeholder.svg';
+
 const clock = (seconds) => {
   if (!Number.isFinite(seconds)) return '';
   const total = Math.max(0, Math.round(seconds));
@@ -25,7 +28,7 @@ function render(track) {
   if (!track) {
     setTitle('Ничего не играет');
     el('artist').textContent = '';
-    el('cover').removeAttribute('src');
+    el('cover').src = PLACEHOLDER;
     el('progress').firstElementChild.style.width = '0';
     el('time').textContent = '';
     return;
@@ -40,7 +43,7 @@ function render(track) {
   el('artist').textContent = artists;
   el('artist').title = artists;
 
-  if (track.cover) el('cover').src = track.cover;
+  el('cover').src = track.cover || PLACEHOLDER;
   el('play').textContent = track.isPlaying ? '⏸' : '▶';
 
   duration = track.duration;
