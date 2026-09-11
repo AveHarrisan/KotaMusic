@@ -12,6 +12,8 @@ on:
       - 'mod/**'
       - 'patches/**'
       - 'scripts/**'
+      - 'package.json'
+      - '.github/workflows/build-mod.yml'
 
 jobs:
   build:
