@@ -90,10 +90,19 @@
     overflow: hidden;
   }
 
+  /* Ползунок появляется по нажатию на динамик и не занимает место зря. */
   #volume {
-    width: 68px;
+    width: 0;
+    opacity: 0;
+    margin: 0;
     accent-color: var(--accent);
+    transition: width .15s, opacity .15s;
     -webkit-app-region: no-drag;
+  }
+
+  #volume.open {
+    width: 58px;
+    opacity: 1;
   }
 
   [hidden] { display: none !important; }
@@ -123,6 +132,7 @@
     color: var(--muted);
     font-size: 11px;
     margin-left: auto;
+    white-space: nowrap;
     -webkit-app-region: drag;
   }
 </style>
@@ -139,6 +149,7 @@
     <button data-action="previous" title="Предыдущий">⏮</button>
     <button data-action="play" title="Пауза или воспроизведение" id="play">⏸</button>
     <button data-action="next" title="Следующий">⏭</button>
+    <button data-action="volume-toggle" id="volume-button" title="Громкость">🔊</button>
     <input id="volume" type="range" min="0" max="1" step="0.01" title="Громкость" />
     <span id="time"></span>
   </div>
