@@ -171,15 +171,46 @@ async function apply(update, onProgress) {
 
   log.info(`Обновляюсь до ${update.tag}: ${source} → ${asar}`);
 
-  spawn(
-    process.execPath,
-    [script, source, asar, integrity, executable, String(process.pid), clientInstaller],
-    {
+  // Установщик клиента закрывает все процессы «Яндекс Музыка.exe», а наш
+  // сценарий запущен именно этим файлом — иначе установщик убьёт его
+  // вместе с клиентом. Поэтому на Windows порядок ведёт cmd: он ставит
+  // клиент, а сценарий подмены зовёт уже после установки.
+  if (clientInstaller && process.platform === 'win32') {
+    const runner = path.join(path.dirname(script), 'update.cmd');
+    const dir = path.dirname(executable);
+
+    fs.writeFileSync(
+      runner,
+      [
+        '@echo off',
+        'chcp 65001 >nul',
+        'timeout /t 3 /nobreak >nul',
+        `"${clientInstaller}" /S /D=${dir}`,
+        'timeout /t 5 /nobreak >nul',
+        'taskkill /IM "%~nx1" /F >nul 2>&1',
+        'timeout /t 3 /nobreak >nul',
+        'set ELECTRON_RUN_AS_NODE=1',
+        `"${executable}" "${script}" "${source}" "${asar}" "${integrity}" "${executable}" 0`,
+        '',
+      ].join('\r\n'),
+      'utf8'
+    );
+
+    spawn('cmd.exe', ['/c', 'start', '', '/min', runner, path.basename(executable)], {
       detached: true,
       stdio: 'ignore',
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-    }
-  ).unref();
+    }).unref();
+  } else {
+    spawn(
+      process.execPath,
+      [script, source, asar, integrity, executable, String(process.pid), clientInstaller],
+      {
+        detached: true,
+        stdio: 'ignore',
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      }
+    ).unref();
+  }
 
   // Именно exit: клиент умеет прятаться в область уведомлений, а нам
   // нужно, чтобы он действительно вышел и отпустил свои файлы.
@@ -218,9 +249,13 @@ async function plan() {
     log.debug('Версию клиента у Яндекса узнать не вышло:', e.message);
   }
 
+  // Проверка пути «клиент вместе с модом» без ожидания нового клиента:
+  // переменная задаётся только при отладке.
+  const pretendNewClient = Boolean(process.env.KOTAMUSIC_CLIENT_TEST);
+
   // Клиент новее нашего: обновляемся вместе, но только когда сборка мода
   // под эту версию уже есть. Иначе ждём автосборку — она идёт раз в три часа.
-  if (official && newer(official.version, installed)) {
+  if (official && (pretendNewClient || newer(official.version, installed))) {
     if (release && release.clientVersion === official.version) {
       return { kind: 'client', ...release, installed, clientUrl: official.url, target: official.version };
     }

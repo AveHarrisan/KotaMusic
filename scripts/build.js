@@ -3,6 +3,8 @@
 // патчи, кладём свои файлы, пакуем обратно.
 //
 //   node scripts/build.js --platform=linux|win32|darwin [--keep]
+//   node scripts/build.js --asar=<файл>   — собрать из уже готового
+//                                           app.asar, ничего не качая
 
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -27,23 +29,38 @@ async function main() {
   const key = INSTALLER_KEY[platform];
   if (!key) throw new Error(`Неизвестная платформа: ${platform}`);
 
-  const { version, downloads } = await upstream.getLatest();
-  console.log(`Клиент Яндекс Музыки: ${version} (${platform})`);
+  let version;
+  let stage;
+  let asarPath;
 
-  const stage = path.join(WORK, `${version}-${platform}`);
-  const installer = path.join(stage, path.basename(new URL(downloads[key]).pathname));
-
-  if (!fs.existsSync(installer)) {
-    console.log('Скачиваю установщик…');
-    await upstream.download(downloads[key], installer);
+  if (args.asar) {
+    // Готовый архив: так собирается мод под версию клиента, которой
+    // на раздаче Яндекса уже нет, — например для проверки обновления.
+    asarPath = path.resolve(args.asar);
+    version = JSON.parse(asar.extractFile(asarPath, 'package.json').toString('utf8')).version;
+    stage = path.join(WORK, `${version}-${platform}-local`);
+    await fsp.mkdir(stage, { recursive: true });
+    console.log(`Клиент Яндекс Музыки: ${version} (из файла ${args.asar})`);
   } else {
-    console.log('Установщик уже скачан, использую его');
-  }
+    const { version: latest, downloads } = await upstream.getLatest();
+    version = latest;
+    console.log(`Клиент Яндекс Музыки: ${version} (${platform})`);
 
-  const asarPath = path.join(stage, 'app.asar');
-  if (!fs.existsSync(asarPath)) {
-    console.log('Достаю app.asar…');
-    await upstream.extractAsar(installer, platform, stage);
+    stage = path.join(WORK, `${version}-${platform}`);
+    const installer = path.join(stage, path.basename(new URL(downloads[key]).pathname));
+
+    if (!fs.existsSync(installer)) {
+      console.log('Скачиваю установщик…');
+      await upstream.download(downloads[key], installer);
+    } else {
+      console.log('Установщик уже скачан, использую его');
+    }
+
+    asarPath = path.join(stage, 'app.asar');
+    if (!fs.existsSync(asarPath)) {
+      console.log('Достаю app.asar…');
+      await upstream.extractAsar(installer, platform, stage);
+    }
   }
 
   const extracted = path.join(stage, 'extracted');

@@ -46,6 +46,9 @@ function launch() {
 
 /** Клиент закрывается не мгновенно — ждём, пока процесс исчезнет. */
 async function waitForExit() {
+  // Ноль означает, что ждать нечего: клиент закрыт раньше нас.
+  if (!pid || pid === '0') return true;
+
   for (let i = 0; i < 60; i += 1) {
     try {
       process.kill(Number(pid), 0);
@@ -118,8 +121,14 @@ async function updateClient() {
     return false;
   }
 
+  // /D задаёт папку установки и должен идти последним без кавычек:
+  // так клиент вернётся ровно туда, где стоял.
+  const dir = path.dirname(executable);
+
   await new Promise((done) => {
-    const child = spawn(clientInstaller, ['/S'], { stdio: 'ignore' });
+    const child = spawn(clientInstaller, ['/S', `/D=${dir}`], { stdio: 'ignore' });
+    log('установщик клиента запущен, pid', child.pid, 'папка', dir);
+
     child.on('exit', (code) => {
       log('установщик клиента завершился с кодом', code);
       done();
