@@ -4,12 +4,15 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const { app } = require('electron');
-
 const REPO = 'AveHarrisan/KotaMusic';
-const API = `https://api.github.com/repos/${REPO}/releases`;
 
-const cacheDir = () => path.join(app.getPath('userData'), 'cache');
+// Адрес можно подменить при проверках: так видно, что мод умеет обойтись
+// без списка релизов.
+const API = process.env.KOTAMUSIC_API || `https://api.github.com/repos/${REPO}/releases`;
+
+// Electron подключаем внутри: без него модуль остаётся пригодным для
+// быстрой проверки обычным Node.
+const cacheDir = () => path.join(require('electron').app.getPath('userData'), 'cache');
 
 /**
  * Локальная сборка вместо релиза — для проверки установщика до того,
@@ -37,21 +40,76 @@ function localRelease(clientVersion) {
   };
 }
 
+/**
+ * Запасной путь, когда список релизов недоступен: у API GitHub есть
+ * предел обращений с одного адреса, а имя файла в релизе постоянное —
+ * значит сборку под нужный клиент можно взять напрямую.
+ */
+async function directRelease(clientVersion) {
+  if (!clientVersion) return null;
+
+  const tag = `mod-${clientVersion}`;
+  const url = `https://github.com/${REPO}/releases/download/${tag}/app.asar`;
+
+  try {
+    const head = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': 'KotaMusic' } });
+    if (!head.ok) return null;
+
+    return {
+      tag,
+      name: `KotaMusic для Яндекс Музыки ${clientVersion}`,
+      notes: '',
+      url,
+      size: Number(head.headers.get('content-length')) || 0,
+      clientVersion,
+      exact: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Релиз мода под указанную версию клиента, иначе — самый свежий. */
 async function findRelease(clientVersion) {
   const local = localRelease(clientVersion);
   if (local) return local;
 
-  const response = await fetch(API, {
-    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'KotaMusic' },
-  });
-  if (!response.ok) throw new Error(`GitHub ответил ${response.status}`);
+  let response;
+
+  try {
+    response = await fetch(API, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'KotaMusic' },
+    });
+  } catch (e) {
+    const direct = await directRelease(clientVersion);
+    if (direct) return direct;
+    throw e;
+  }
+
+  if (!response.ok) {
+    const direct = await directRelease(clientVersion);
+    if (direct) return direct;
+    throw new Error(`GitHub ответил ${response.status}`);
+  }
 
   const releases = (await response.json()).filter((r) => !r.draft);
-  if (!releases.length) throw new Error('Релизов пока нет');
 
-  const exact = releases.find((r) => r.tag_name === `mod-${clientVersion}`);
-  const chosen = exact || releases[0];
+  if (!releases.length) {
+    const direct = await directRelease(clientVersion);
+    if (direct) return direct;
+    throw new Error('Релизов пока нет');
+  }
+
+  // Релиз установщика лежит рядом с релизами мода — берём только моды.
+  const mods = releases.filter((r) => /^mod-/.test(r.tag_name));
+  const exact = mods.find((r) => r.tag_name === `mod-${clientVersion}`);
+  const chosen = exact || mods[0];
+
+  if (!chosen) {
+    const direct = await directRelease(clientVersion);
+    if (direct) return direct;
+    throw new Error('Сборок мода пока нет');
+  }
 
   const asset = chosen.assets.find((a) => a.name === 'app.asar');
   if (!asset) throw new Error(`В релизе ${chosen.tag_name} нет файла мода`);

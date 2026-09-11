@@ -25,6 +25,9 @@ function render(state) {
   // главная кнопка окна именно эта.
   el('install-client').hidden = Boolean(state.client);
   el('pick').hidden = Boolean(state.client);
+
+  // Сборку мода не видно — даём повторить попытку, не перезапуская окно.
+  el('retry').hidden = Boolean(state.release);
   el('install').classList.toggle('secondary', !state.client);
 
   if (!state.client) {
@@ -79,6 +82,11 @@ el('install-client').addEventListener('click', async () => {
   render(await ipcRenderer.invoke('installer:state'));
 });
 
+el('retry').addEventListener('click', async () => {
+  setStatus('Проверяем…');
+  render(await ipcRenderer.invoke('installer:state'));
+});
+
 el('pick').addEventListener('click', async () => {
   const result = await ipcRenderer.invoke('installer:pick-folder');
 
@@ -125,5 +133,11 @@ function watchForClient() {
 
   if (!state.client) watchForClient();
 
-  if (!state.release && state.client) setStatus('Не удалось получить список сборок мода.', 'error');
+  if (!state.release && state.client) {
+    setStatus(
+      'Список сборок мода недоступен — GitHub не ответил. Проверьте сеть ' +
+        'и нажмите «Проверить снова».',
+      'error'
+    );
+  }
 })();
