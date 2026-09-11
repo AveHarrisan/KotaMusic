@@ -135,8 +135,15 @@ function load() {
   // Папку кеша клиент задаёт себе сам — настройка ничего не меняла.
   delete values.cacheDir;
   delete values.bisect;
-  // Отметка диагностического набора 10.09: он держал название трека
-  // в списке участников выключенным.
+
+  // Диагностический набор от 10.09 гасил название трека в списке
+  // участников и подменял полосу счётчиком. Возвращаем как было.
+  if (values.preset === 'working-2026-09-10') {
+    values.progress = DEFAULTS.progress;
+    values.showTrackInMemberList = DEFAULTS.showTrackInMemberList;
+    migrated = true;
+  }
+
   delete values.preset;
   delete values.authorStyle;
 
@@ -145,7 +152,7 @@ function load() {
 
   if (migrated) {
     save();
-    log.info('Настройки клавиш перенесены в новый вид');
+    log.info('Настройки перенесены в новый вид');
   }
 
   return values;
