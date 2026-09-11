@@ -11,18 +11,7 @@ const log = require('./log');
 
 const FILE = 'kotamusic.json';
 
-// Состав статуса, который в проверке 10.09 доходил до других участников.
-// От него отталкиваемся, возвращая остальные возможности по одной.
-const WORKING_PRESET = {
-  progress: 'counter',
-  showTrackInMemberList: false,
-};
-
 const DEFAULTS = {
-  // Отметка применённого набора: без неё сохранённые ранее значения
-  // остались бы поверх и проверка была бы нечистой.
-  preset: null,
-
   richPresence: true,
   // 'bar' — полоса с началом и концом (видна в карточке профиля)
   // 'counter' — счётчик времени (виден и в карточке голосового канала)
@@ -146,6 +135,9 @@ function load() {
   // Папку кеша клиент задаёт себе сам — настройка ничего не меняла.
   delete values.cacheDir;
   delete values.bisect;
+  // Отметка диагностического набора 10.09: он держал название трека
+  // в списке участников выключенным.
+  delete values.preset;
   delete values.authorStyle;
 
   // Неизвестные действия могли появиться в новой версии мода.
@@ -154,13 +146,6 @@ function load() {
   if (migrated) {
     save();
     log.info('Настройки клавиш перенесены в новый вид');
-  }
-
-  // Один раз приводим настройки к проверенному набору.
-  if (values.preset !== 'working-2026-09-10') {
-    values = { ...values, ...WORKING_PRESET, preset: 'working-2026-09-10' };
-    save();
-    log.info('Настройки приведены к проверенному набору');
   }
 
   return values;
