@@ -10,20 +10,34 @@ const log = require('./log');
 
 const WIDTH = 340;
 const HEIGHT = 108;
+
+// Компактный вид не только ниже, но и уже — иначе окно выглядит
+// неестественно вытянутым.
+const COMPACT_WIDTH = 250;
+const COMPACT_HEIGHT = 76;
 const MARGIN = 24;
+
+// Прозрачность зафиксированного окна: видно, но не мешает.
+const LOCKED_OPACITY = 0.55;
 
 let window = null;
 let lastTrack = null;
 let lastPosition = null;
+let unlockTimer = null;
+let unlockUntil = 0;
 
 /** Правый нижний угол экрана — привычное место для такого окна. */
 function corner() {
   const { workArea } = screen.getPrimaryDisplay();
   return {
-    x: workArea.x + workArea.width - WIDTH - MARGIN,
-    y: workArea.y + workArea.height - HEIGHT - MARGIN,
+    x: workArea.x + workArea.width - currentWidth() - MARGIN,
+    y: workArea.y + workArea.height - currentHeight() - MARGIN,
   };
 }
+
+const compact = () => Boolean(settings.get().miniplayerCompact);
+const currentWidth = () => (compact() ? COMPACT_WIDTH : WIDTH);
+const currentHeight = () => (compact() ? COMPACT_HEIGHT : HEIGHT);
 
 function create() {
   if (window && !window.isDestroyed()) return window;
@@ -31,8 +45,8 @@ function create() {
   const position = corner();
 
   window = new BrowserWindow({
-    width: WIDTH,
-    height: HEIGHT,
+    width: currentWidth(),
+    height: currentHeight(),
     x: position.x,
     y: position.y,
     frame: false,
@@ -61,7 +75,65 @@ function create() {
     window = null;
   });
 
+  window.webContents.on('did-finish-load', () => applyLock());
+
   return window;
+}
+
+/**
+ * Зафиксированное окно не ловит мышь и становится прозрачным.
+ * Временная разблокировка снимает это на несколько секунд.
+ */
+function applyLock() {
+  if (!alive()) return;
+
+  const locked = settings.get().miniplayerLocked && Date.now() >= unlockUntil;
+
+  window.setIgnoreMouseEvents(locked, { forward: true });
+  window.setOpacity(locked ? LOCKED_OPACITY : 1);
+
+  window.webContents.send('kotamusic:miniplayer:lock', {
+    locked,
+    // Сколько секунд осталось до обратной фиксации.
+    remaining: locked ? 0 : Math.max(0, Math.ceil((unlockUntil - Date.now()) / 1000)),
+  });
+}
+
+/** Снимает фиксацию на время, заданное в настройках. */
+function unlockTemporarily() {
+  if (!settings.get().miniplayerLocked) return;
+  if (!alive()) show();
+
+  startUnlock();
+  log.info(`Фиксация снята на ${settings.get().miniplayerUnlockSeconds} с`);
+}
+
+/**
+ * Продлевает уже снятую фиксацию. Само по себе движение мыши её не снимает:
+ * при фиксации система всё равно передаёт окну движения курсора, и иначе
+ * окно разблокировалось бы от одного проезда мышью мимо.
+ */
+function extendUnlock() {
+  if (Date.now() >= unlockUntil) return;
+  startUnlock();
+}
+
+function startUnlock() {
+  if (!settings.get().miniplayerLocked) return;
+
+  const seconds = Math.max(5, Number(settings.get().miniplayerUnlockSeconds) || 30);
+  unlockUntil = Date.now() + seconds * 1000;
+
+  applyLock();
+
+  clearInterval(unlockTimer);
+  unlockTimer = setInterval(() => {
+    if (Date.now() >= unlockUntil) {
+      clearInterval(unlockTimer);
+      unlockTimer = null;
+    }
+    applyLock();
+  }, 1000);
 }
 
 const alive = () => window && !window.isDestroyed();
@@ -90,6 +162,8 @@ function push() {
     seek: settings.get().miniplayerSeek,
     volume: settings.get().miniplayerVolume,
     close: settings.get().miniplayerClose,
+    compact: settings.get().miniplayerCompact,
+    volumeStep: Math.max(1, Math.min(25, Number(settings.get().volumeStep) || 1)),
   });
 
   window.webContents.send('kotamusic:miniplayer:track', lastTrack);
@@ -116,13 +190,27 @@ function start() {
     settings.set({ miniplayer: false });
   });
 
+  // Отсчёт продлевают только нажатия: от одного движения мыши
+  // над окном фиксация возвращаться не должна.
   ipcMain.on('kotamusic:miniplayer:action', (_event, action) => {
+    extendUnlock();
     log.info('Мини-плеер:', action);
     require('./player').perform(action);
   });
 
   settings.onChange((now, before) => {
     if (now.miniplayer !== before.miniplayer) return now.miniplayer ? show() : hide();
+
+    if (now.miniplayerCompact !== before.miniplayerCompact && alive()) {
+      // Размер меняем вместе с местом: окно должно остаться в углу.
+      const position = corner();
+      window.setBounds({ ...position, width: currentWidth(), height: currentHeight() });
+    }
+
+    if (now.miniplayerLocked !== before.miniplayerLocked) {
+      unlockUntil = 0;
+      applyLock();
+    }
 
     // Внешний вид окна меняется без перезапуска.
     push();
@@ -136,4 +224,4 @@ function start() {
   else app.once('ready', init);
 }
 
-module.exports = { start, toggle, setTrack, setPosition, show, hide };
+module.exports = { start, toggle, setTrack, setPosition, show, hide, unlockTemporarily };

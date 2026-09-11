@@ -197,9 +197,35 @@ function watchVolume() {
   setInterval(check, 400);
 }
 
+/**
+ * Колесо над регулятором громкости: клиент меняет её крупными шагами,
+ * а нам нужен свой, из настроек.
+ */
+function ownVolumeWheel(step) {
+  document.addEventListener(
+    'wheel',
+    (event) => {
+      const target = event.target.closest(
+        '[data-test-id="CHANGE_VOLUME_SLIDER"],[data-test-id="CHANGE_VOLUME_BUTTON"]'
+      );
+      if (!target) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const level = changeVolume((event.deltaY < 0 ? 1 : -1) * (step / 100));
+      if (level !== null) showVolume(level);
+    },
+    { capture: true, passive: false }
+  );
+}
+
 function start() {
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
-    if (state?.values?.showVolumePercent !== false) watchVolume();
+    const values = state?.values ?? {};
+
+    if (values.showVolumePercent !== false) watchVolume();
+    ownVolumeWheel(Math.max(1, Math.min(25, Number(values.volumeStep) || 1)));
   });
 }
 

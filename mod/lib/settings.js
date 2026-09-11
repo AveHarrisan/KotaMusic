@@ -40,19 +40,35 @@ const DEFAULTS = {
   miniplayerVolume: true,
   miniplayerClose: true,
 
+  // Компактный вид: то же окно, но ниже и плотнее.
+  miniplayerCompact: false,
+
+  // Зафиксированное окно становится полупрозрачным и не ловит мышь —
+  // на него можно только смотреть.
+  miniplayerLocked: false,
+
+  // На сколько секунд горячая клавиша снимает фиксацию.
+  miniplayerUnlockSeconds: 30,
+
+  // Шаг изменения громкости колесом мыши, в процентах.
+  volumeStep: 1,
+
   // Кнопки управления в миниатюре окна на панели задач Windows.
   taskbarButtons: true,
 
   // Глобальные горячие клавиши: действие → сочетание. Пустая строка
   // означает, что клавиши у действия нет.
+  // Сочетания по умолчанию не заданы: пусть каждый выберет удобные ему
+  // и не ловит совпадения с чужими программами.
   hotkeys: {
-    play: 'Control+Alt+Space',
-    next: 'Control+Alt+Right',
-    previous: 'Control+Alt+Left',
-    volumeUp: 'Control+Alt+Up',
-    volumeDown: 'Control+Alt+Down',
-    like: 'Control+Alt+L',
+    play: '',
+    next: '',
+    previous: '',
+    volumeUp: '',
+    volumeDown: '',
+    like: '',
     miniplayer: '',
+    miniplayerUnlock: '',
   },
 
   // Масштаб интерфейса в процентах.
@@ -170,12 +186,16 @@ const onChange = (listener) => listeners.add(listener);
 function start() {
   load();
 
-  ipcMain.handle('kotamusic:settings:get', () => ({
-    values,
-    defaults: DEFAULTS,
-    version: branding.version,
-    name: branding.name,
-  }));
+  ipcMain.handle('kotamusic:settings:get', () => {
+    // Занятые сочетания показываем в настройках: иначе человек решит,
+    // что клавиша не работает по вине мода.
+    let busy = [];
+    try {
+      busy = require('./hotkeys').busy();
+    } catch {}
+
+    return { values, defaults: DEFAULTS, version: branding.version, name: branding.name, busy };
+  });
 
   ipcMain.handle('kotamusic:settings:set', (_event, patch) => {
     if (!patch || typeof patch !== 'object') return values;

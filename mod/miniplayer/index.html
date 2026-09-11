@@ -37,7 +37,9 @@
     justify-self: center;
   }
 
-  .meta { min-width: 0; align-self: center; }
+  /* Справа держим место под крестик: бегущая строка не должна
+     проезжать под ним. */
+  .meta { min-width: 0; align-self: center; padding-right: 24px; }
 
   #title {
     font-weight: 600;
@@ -45,6 +47,20 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* Если строка не помещается — пускаем её бегущей. */
+  #title.scroll { text-overflow: clip; }
+
+  #title.scroll > span {
+    display: inline-block;
+    padding-right: 40px;
+    animation: marquee linear infinite;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
   }
 
   #artist {
@@ -107,6 +123,55 @@
 
   [hidden] { display: none !important; }
 
+  /* Кружок показывает, куда попадёт перемотка. */
+  #seek-knob {
+    position: absolute;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .12s;
+    pointer-events: none;
+  }
+
+  #seek:hover #seek-knob { opacity: 1; }
+
+  #countdown {
+    position: fixed;
+    left: 12px;
+    top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    pointer-events: none;
+  }
+
+  #countdown:empty { display: none; }
+
+  /* Компактный вид: то же самое, но плотнее и без обложки покрупнее. */
+  body[data-compact] {
+    grid-template-columns: 46px 1fr;
+    gap: 9px;
+    padding: 8px 10px;
+  }
+
+  body[data-compact] #cover { width: 38px; height: 38px; border-radius: 6px; }
+  body[data-compact] #title { font-size: 13px; }
+  body[data-compact] #artist { display: none; }
+  body[data-compact] #title { font-size: 12px; }
+  body[data-compact] .controls { margin-top: 4px; gap: 4px; }
+  body[data-compact] button { padding: 2px 4px; font-size: 12px; }
+  body[data-compact] #seek { padding: 5px 0; }
+  body[data-compact] #time { font-size: 10px; }
+  body[data-compact] #close { top: 4px; right: 6px; font-size: 12px; }
+  body[data-compact] .meta { padding-right: 20px; }
+  body[data-compact] #volume.open { width: 44px; }
+  body[data-compact] #volume-label,
+  body[data-compact] #countdown { font-size: 10px; top: 5px; }
+
   #progress > i {
     display: block;
     height: 100%;
@@ -119,7 +184,7 @@
   #volume-label {
     position: fixed;
     right: 12px;
-    bottom: 13px;
+    top: 8px;
     font-size: 11px;
     font-weight: 600;
     color: var(--accent);
@@ -142,6 +207,12 @@
   }
 
   #close:hover { color: var(--text); background: rgba(255,255,255,.12); }
+
+  /* Первое нажатие только предупреждает: закрытие — со второго. */
+  #close.armed {
+    color: #ff5c5c;
+    background: rgba(255, 92, 92, .15);
+  }
 
   #time {
     color: var(--muted);
@@ -171,7 +242,11 @@
 </div>
 
 <div id="volume-label"></div>
+<div id="countdown"></div>
 
-<div id="seek"><div id="progress"><i></i></div></div>
+<div id="seek" style="position: relative">
+  <div id="progress"><i></i></div>
+  <span id="seek-knob"></span>
+</div>
 
 <script src="./renderer.js"></script>

@@ -13,15 +13,17 @@ const clock = (seconds) => {
 };
 
 let duration = null;
-let options = { seek: true, volume: true, close: true };
+let options = { seek: true, volume: true, close: true, compact: false, volumeStep: 1 };
+let lastTrack = null;
 
 let hasTrack = false;
 
 function render(track) {
+  lastTrack = track;
   hasTrack = Boolean(track);
 
   if (!track) {
-    el('title').textContent = 'Ничего не играет';
+    setTitle('Ничего не играет');
     el('artist').textContent = '';
     el('cover').removeAttribute('src');
     el('progress').firstElementChild.style.width = '0';
@@ -29,10 +31,12 @@ function render(track) {
     return;
   }
 
-  el('title').textContent = track.title;
-  el('title').title = track.title;
-
   const artists = (track.artists || []).join(', ');
+
+  // В компактном виде исполнителя прячем в ту же строку: места мало,
+  // а знать, кто играет, всё равно хочется.
+  setTitle(options.compact && artists ? `${track.title} — ${artists}` : track.title);
+
   el('artist').textContent = artists;
   el('artist').title = artists;
 
@@ -41,6 +45,33 @@ function render(track) {
 
   duration = track.duration;
   update(track.position);
+}
+
+/** Ставит строку названия и пускает её бегущей, если не помещается. */
+function setTitle(text) {
+  const node = el('title');
+  node.title = text;
+
+  node.classList.remove('scroll');
+  node.textContent = text;
+
+  // Сравниваем ширину текста с шириной окна уже после отрисовки.
+  requestAnimationFrame(() => {
+    if (node.scrollWidth <= node.clientWidth + 1) return;
+
+    const span = document.createElement('span');
+    span.textContent = text;
+
+    const copy = span.cloneNode(true);
+    node.textContent = '';
+    node.append(span, copy);
+    node.classList.add('scroll');
+
+    // Скорость постоянная: длинная строка едет дольше, а не быстрее.
+    const seconds = Math.max(6, Math.round(span.scrollWidth / 22));
+    span.style.animationDuration = `${seconds}s`;
+    copy.style.animationDuration = `${seconds}s`;
+  });
 }
 
 function update(position) {
@@ -74,9 +105,28 @@ function showVolume(open = true) {
   if (open) volumeTimer = setTimeout(() => el('volume').classList.remove('open'), 3000);
 }
 
+let closeArmed = null;
+
 document.addEventListener('click', (event) => {
   if (event.target.closest('#close')) {
-    return ipcRenderer.send('kotamusic:miniplayer:close');
+    // Случайно закрыть окно легко, поэтому первое нажатие только
+    // подсвечивает крестик, а закрывает второе.
+    if (closeArmed) {
+      clearTimeout(closeArmed);
+      closeArmed = null;
+      return ipcRenderer.send('kotamusic:miniplayer:close');
+    }
+
+    el('close').classList.add('armed');
+    el('close').title = 'Нажмите ещё раз, чтобы закрыть';
+
+    closeArmed = setTimeout(() => {
+      closeArmed = null;
+      el('close').classList.remove('armed');
+      el('close').title = 'Закрыть мини-плеер';
+    }, 3000);
+
+    return;
   }
 
   if (event.target.closest('[data-action="volume-toggle"]')) {
@@ -92,12 +142,32 @@ ipcRenderer.on('kotamusic:miniplayer:track', (_event, track) => render(track));
 ipcRenderer.on('kotamusic:miniplayer:options', (_event, next) => {
   options = next;
 
+  document.body.toggleAttribute('data-compact', Boolean(options.compact));
+
+  // Вид сменился — строку названия надо собрать заново.
+  render(lastTrack);
+
   el('volume').hidden = !options.volume;
   el('volume-button').hidden = !options.volume;
   if (!options.volume) el('volume').classList.remove('open');
   el('close').hidden = !options.close;
   if (options.seek) el('seek').dataset.seekable = '1';
   else delete el('seek').dataset.seekable;
+});
+
+ipcRenderer.on('kotamusic:miniplayer:lock', (_event, state) => {
+  el('countdown').textContent = state.remaining ? `${state.remaining} с` : '';
+});
+
+// Подсветка места перемотки: кружок следует за курсором.
+el('seek').addEventListener('mousemove', (event) => {
+  if (!options.seek || !duration) return;
+
+  const box = el('progress').getBoundingClientRect();
+  const x = Math.min(box.width, Math.max(0, event.clientX - box.left));
+
+  el('seek-knob').style.left = `${x}px`;
+  el('seek-knob').title = clock((x / box.width) * duration);
 });
 
 // Перемотка: щелчок по полосе задаёт позицию.
@@ -125,7 +195,7 @@ document.addEventListener(
     if (!options.volume) return;
     if (!event.target.closest('#volume-button, #volume')) return;
 
-    const step = event.deltaY < 0 ? 0.05 : -0.05;
+    const step = (event.deltaY < 0 ? 1 : -1) * ((options.volumeStep || 1) / 100);
     const value = Math.min(1, Math.max(0, Number(el('volume').value || 0) + step));
 
     el('volume').value = String(value);

@@ -15,6 +15,7 @@ const NAMES = {
   volumeDown: 'тише',
   like: 'лайк',
   miniplayer: 'мини-плеер',
+  miniplayerUnlock: 'снять фиксацию мини-плеера',
 };
 
 function send(action) {
@@ -23,9 +24,16 @@ function send(action) {
     return require('./miniplayer').toggle();
   }
 
+  if (action === 'miniplayerUnlock') {
+    log.info('Горячая клавиша: снять фиксацию мини-плеера');
+    return require('./miniplayer').unlockTemporarily();
+  }
+
   log.info('Горячая клавиша:', action);
   require('./player').perform(action);
 }
+
+let busyCombinations = [];
 
 function unregister() {
   globalShortcut.unregisterAll();
@@ -43,6 +51,7 @@ function register() {
   if (!combinations.length) return;
 
   const busy = [];
+
   for (const [action, combination] of combinations) {
     // Сочетание может быть занято другой программой — это не ошибка,
     // просто сообщаем и продолжаем.
@@ -54,6 +63,8 @@ function register() {
     }
     if (!ok) busy.push(combination);
   }
+
+  busyCombinations = busy;
 
   const total = combinations.length;
   log.info(`Горячие клавиши: зарегистрировано ${total - busy.length} из ${total}`);
@@ -71,4 +82,4 @@ function start() {
   app.on('will-quit', unregister);
 }
 
-module.exports = { start, NAMES };
+module.exports = { start, NAMES, busy: () => busyCombinations };

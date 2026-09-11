@@ -13,6 +13,7 @@ const ANCHOR_TEXT = 'О приложении';
 
 let config = null;
 let defaults = {};
+let busy = [];
 let meta = { name: 'KotaMusic', version: '' };
 
 const el = (tag, style, text) => {
@@ -96,6 +97,13 @@ function hotkeyField(value, onChange) {
     // Одни модификаторы сочетанием не считаются.
     if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return;
 
+    // Без модификатора клавиша перехватывалась бы во всей системе —
+    // например, цифра перестала бы печататься где угодно.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey) {
+      button.textContent = 'Нужен Ctrl, Alt или Win';
+      return;
+    }
+
     const parts = [];
     if (event.ctrlKey) parts.push('Control');
     if (event.altKey) parts.push('Alt');
@@ -155,8 +163,14 @@ function row(title, description, control) {
 
   texts.appendChild(el('div', 'font-size:15px;font-weight:500', title));
   if (description) {
+    const warning = description.includes('занято');
     texts.appendChild(
-      el('div', 'font-size:13px;opacity:.6;margin-top:2px;line-height:1.3', description)
+      el(
+        'div',
+        'font-size:13px;margin-top:2px;line-height:1.3;' +
+          (warning ? 'color:#ff8a80' : 'opacity:.6'),
+        description
+      )
     );
   }
 
@@ -245,6 +259,23 @@ function fill(container) {
       'Кнопка закрытия',
       'Крестик в углу окна',
       toggle(config.miniplayerClose, (value) => update({ miniplayerClose: value }))
+    ),
+    row(
+      'Компактный вид',
+      'Окно ниже: обложка меньше, исполнитель скрыт',
+      toggle(config.miniplayerCompact, (value) => update({ miniplayerCompact: value }))
+    ),
+    row(
+      'Зафиксировать окно',
+      'Окно становится полупрозрачным и не ловит мышь — только смотреть',
+      toggle(config.miniplayerLocked, (value) => update({ miniplayerLocked: value }))
+    ),
+    row(
+      'Разблокировка на, секунд',
+      'На столько горячая клавиша снимает фиксацию; отсчёт виден в окне',
+      textField(String(config.miniplayerUnlockSeconds ?? 30), (value) =>
+        update({ miniplayerUnlockSeconds: Math.min(300, Math.max(5, Number(value) || 30)) })
+      )
     )
   );
 
@@ -259,16 +290,20 @@ function fill(container) {
     volumeDown: 'Тише',
     like: 'Лайк',
     miniplayer: 'Показать мини-плеер',
+    miniplayerUnlock: 'Снять фиксацию мини-плеера',
   };
 
   add(group('Горячие клавиши'));
 
   for (const [action, title] of Object.entries(actions)) {
+    const combination = hotkeys[action];
+    const taken = combination && busy.includes(combination);
+
     add(
       row(
         title,
-        '',
-        hotkeyField(hotkeys[action], (value) =>
+        taken ? 'Сочетание занято другой программой — выберите другое' : '',
+        hotkeyField(combination, (value) =>
           update({ hotkeys: { ...hotkeys, [action]: value } })
         )
       )
@@ -300,6 +335,13 @@ function fill(container) {
       'Процент при изменении громкости',
       'Короткая подсказка рядом с ползунком',
       toggle(config.showVolumePercent, (value) => update({ showVolumePercent: value }))
+    ),
+    row(
+      'Шаг громкости колесом, %',
+      'На столько меняется громкость за одно движение колеса',
+      textField(String(config.volumeStep ?? 1), (value) =>
+        update({ volumeStep: Math.min(25, Math.max(1, Number(value) || 1)) })
+      )
     ),
     row(
       'Не гасить экран во время музыки',
@@ -362,6 +404,7 @@ async function start() {
   const state = await ipcRenderer.invoke('kotamusic:settings:get');
   config = state.values;
   defaults = state.defaults || {};
+  busy = state.busy || [];
   meta = { name: state.name, version: state.version };
 
   // Страница настроек — часть одностраничного приложения: она появляется
