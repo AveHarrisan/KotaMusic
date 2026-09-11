@@ -36,9 +36,6 @@ const DEFAULTS = {
   // Мини-плеер поверх других окон.
   miniplayer: false,
 
-  // Своё сочетание клавиш для мини-плеера. Пусто — клавиши нет.
-  miniplayerHotkey: '',
-
   // Что показывать в мини-плеере.
   miniplayerSeek: true,
   miniplayerVolume: true,
@@ -47,8 +44,17 @@ const DEFAULTS = {
   // Кнопки управления в миниатюре окна на панели задач Windows.
   taskbarButtons: true,
 
-  // Глобальные горячие клавиши поверх других окон.
-  hotkeys: true,
+  // Глобальные горячие клавиши: действие → сочетание. Пустая строка
+  // означает, что клавиши у действия нет.
+  hotkeys: {
+    play: 'Control+Alt+Space',
+    next: 'Control+Alt+Right',
+    previous: 'Control+Alt+Left',
+    volumeUp: 'Control+Alt+Up',
+    volumeDown: 'Control+Alt+Down',
+    like: 'Control+Alt+L',
+    miniplayer: '',
+  },
 
   // Масштаб интерфейса в процентах.
   zoom: 100,
@@ -94,6 +100,36 @@ function load() {
   } catch (e) {
     log.warn('Настройки повреждены, беру значения по умолчанию:', e.message);
     values = { ...DEFAULTS };
+  }
+
+  // Раньше клавиши были одним переключателем, а сочетание мини-плеера
+  // лежало отдельно. Переносим старые настройки в новый вид.
+  let migrated = false;
+
+  if (typeof values.hotkeys === 'boolean') {
+    const enabled = values.hotkeys;
+    values.hotkeys = { ...DEFAULTS.hotkeys };
+
+    if (!enabled) {
+      for (const action of Object.keys(values.hotkeys)) values.hotkeys[action] = '';
+    }
+
+    migrated = true;
+  }
+
+  if (values.miniplayerHotkey) {
+    values.hotkeys = { ...values.hotkeys, miniplayer: values.miniplayerHotkey };
+    migrated = true;
+  }
+
+  delete values.miniplayerHotkey;
+
+  // Неизвестные действия могли появиться в новой версии мода.
+  values.hotkeys = { ...DEFAULTS.hotkeys, ...values.hotkeys };
+
+  if (migrated) {
+    save();
+    log.info('Настройки клавиш перенесены в новый вид');
   }
 
   // Один раз приводим настройки к проверенному набору.
