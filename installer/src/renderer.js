@@ -73,7 +73,7 @@ el('install').addEventListener('click', async () => {
 
 el('install-client').addEventListener('click', async () => {
   el('install-client').disabled = true;
-  setStatus('Качаем Яндекс Музыку…');
+  setStatus('Качаем и ставим Яндекс Музыку…');
   el('progress').hidden = false;
 
   const result = await ipcRenderer.invoke('installer:install-client');

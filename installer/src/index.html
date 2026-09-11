@@ -12,7 +12,9 @@
     flex-direction: column;
     gap: 16px;
     padding: 26px;
-    overflow: hidden;
+    /* Окно можно растянуть, а если места не хватило — содержимое
+       прокручивается, а не обрезается. */
+    overflow-y: auto;
     font: 14px/1.45 system-ui, sans-serif;
     color: #fff;
     background: #161616;

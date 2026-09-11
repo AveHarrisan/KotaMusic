@@ -16,8 +16,9 @@ let currentRelease = null;
 function create() {
   window = new BrowserWindow({
     width: 520,
-    height: 540,
-    resizable: false,
+    height: 620,
+    minHeight: 480,
+    resizable: true,
     title: 'KotaMusic',
     backgroundColor: '#161616',
     webPreferences: {
@@ -92,22 +93,10 @@ async function doInstallClient() {
   try {
     const { version, url } = await upstream.latest();
 
-    // Куда ставить — решает человек. По умолчанию предлагаем обычное
-    // место: установщик Яндекса иначе подставит папку прошлой установки,
-    // а она бывает где угодно.
-    let dir = null;
-
-    if (process.platform === 'win32') {
-      const choice = await dialog.showOpenDialog(window, {
-        title: 'Куда поставить Яндекс Музыку',
-        defaultPath: defaultClientDir(),
-        buttonLabel: 'Поставить сюда',
-        properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
-      });
-
-      if (choice.canceled || !choice.filePaths.length) return { ok: false };
-      dir = choice.filePaths[0];
-    }
+    // Ставим в обычное место и без вопросов: установщик Яндекса иначе
+    // подставит папку прошлой установки, а она бывает где угодно.
+    // Кому нужна своя папка — есть «Указать папку с клиентом».
+    const dir = process.platform === 'win32' ? defaultClientDir() : null;
 
     const file = await upstream.download(url, (ratio) =>
       window?.webContents.send('installer:progress', ratio)
