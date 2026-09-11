@@ -23,6 +23,13 @@ jobs:
             name: linux
 
     runs-on: ${{ matrix.os }}
+
+    # Секреты подписи держим на уровне задачи: иначе шаг не сможет
+    # проверить, заданы они или нет.
+    env:
+      WINDOWS_CERT: ${{ secrets.WINDOWS_CERT }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,8 +41,19 @@ jobs:
         working-directory: installer
         run: npm install
 
+      # Подпись включается, только когда в репозитории заданы секреты:
+      # без них сборка идёт как раньше. Подробности — в docs/SIGNING.md.
+      - name: Подготовить сертификат
+        if: matrix.name == 'windows' && env.WINDOWS_CERT != ''
+        shell: bash
+        run: |
+          echo "$WINDOWS_CERT" | base64 --decode > "$RUNNER_TEMP/kotamusic.pfx"
+          echo "CSC_LINK=$RUNNER_TEMP/kotamusic.pfx" >> $GITHUB_ENV
+
       - name: Собрать
         working-directory: installer
+        env:
+          CSC_KEY_PASSWORD: ${{ env.WINDOWS_CERT_PASSWORD }}
         run: npx electron-builder --publish never
 
       - uses: actions/upload-artifact@v4
