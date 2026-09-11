@@ -90,7 +90,7 @@ el('install-client').addEventListener('click', async () => {
   } else if (result.ok) {
     setStatus(
       `Запустили установщик Яндекс Музыки ${result.version}. ` +
-        'Пройдите установку и нажмите «Установить».',
+        'Пройдите установку и нажмите «Установить мод».',
       'done'
     );
   } else {

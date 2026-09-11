@@ -35,7 +35,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
    [Linux](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.AppImage) ·
    [macOS](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.dmg)
 2. Закройте Яндекс Музыку и запустите установщик
-3. Нажмите «Установить» и дождитесь окончания
+3. Нажмите «Установить мод» и дождитесь окончания
 
 Официального клиента у вас может и не быть: установщик сам предложит его
 поставить — адрес свежей версии он берёт у Яндекса.
