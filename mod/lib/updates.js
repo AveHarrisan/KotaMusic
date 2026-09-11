@@ -62,10 +62,28 @@ async function latest() {
   if (!mod) return null;
 
   const asset = mod.assets?.find((a) => a.name === 'app.asar');
+  const info = mod.assets?.find((a) => a.name === 'build-info.json');
+
+  // Версия самого мода лежит рядом с архивом: релиз на версию клиента
+  // один, а мод внутри него обновляется.
+  let modVersion = null;
+
+  if (info) {
+    try {
+      const response = await fetch(info.browser_download_url, {
+        headers: { 'User-Agent': branding.name },
+      });
+
+      if (response.ok) modVersion = (await response.json()).modVersion || null;
+    } catch (e) {
+      log.debug('Версию мода из релиза прочитать не вышло:', e.message);
+    }
+  }
 
   return {
     tag: mod.tag_name,
     clientVersion: mod.tag_name.replace(/^mod-/, ''),
+    modVersion,
     url: mod.html_url,
     // Ссылка на сам архив — по ней мод обновляет себя без установщика.
     asset: asset?.browser_download_url || null,
@@ -210,9 +228,19 @@ async function plan() {
     return { kind: 'waiting', installed, target: official.version, url: `${branding.repositoryUrl}/releases` };
   }
 
-  // Клиент тот же, а сборка мода новее той, из которой мы собраны.
+  // Клиент тот же, а мод обновился: сверяем и версию клиента, под который
+  // собран архив, и версию самого мода.
   if (release && newer(release.clientVersion, branding.builtForClient)) {
     return { kind: 'mod', ...release, installed: branding.builtForClient };
+  }
+
+  if (release && release.modVersion && newer(release.modVersion, branding.version)) {
+    return {
+      kind: 'mod',
+      ...release,
+      installed: branding.version,
+      modOnly: true,
+    };
   }
 
   return null;

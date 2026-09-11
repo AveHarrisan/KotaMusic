@@ -16,7 +16,9 @@ ipcRenderer.on('kotamusic:update:available', (_event, update) => {
     'opacity:0;transition:opacity .2s;-webkit-app-region:no-drag';
 
   const message = {
-    mod: `Вышла сборка мода под клиент ${update.clientVersion}, у вас стоит сборка под ${update.installed}.`,
+    mod: update.modOnly
+      ? `Вышла версия мода ${update.modVersion}, у вас ${update.installed}.`
+      : `Вышла сборка мода под клиент ${update.clientVersion}, у вас стоит сборка под ${update.installed}.`,
     client:
       `Вышла Яндекс Музыка ${update.target}, и сборка мода под неё готова. ` +
       'Обновим вместе — мод останется на месте.',
