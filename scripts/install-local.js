@@ -69,6 +69,14 @@ function main() {
   }
 
   fs.copyFileSync(built, asarPath);
+
+  // Рядом с архивом лежат файлы, которые системе нужны настоящими:
+  // иконки кнопок панели задач читаются только с диска.
+  const unpacked = built + '.unpacked';
+  if (fs.existsSync(unpacked)) {
+    fs.cpSync(unpacked, asarPath + '.unpacked', { recursive: true, force: true });
+  }
+
   console.log('Мод установлен, хеш заголовка:', headerHash(asarPath));
 
   if (exePath) {

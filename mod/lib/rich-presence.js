@@ -9,6 +9,7 @@ const branding = require('../branding');
 const album = require('./album');
 const settings = require('./settings');
 const tweaks = require('./tweaks');
+const taskbar = require('./taskbar');
 const bisect = require('./bisect');
 const log = require('./log');
 
@@ -383,6 +384,7 @@ function start() {
     // Позиция прошлого трека к новому не относится — иначе полоса
     // покажет чужое время, а проверка перемотки ложно сработает.
     tweaks.applySleepBlock(Boolean(state?.isPlaying));
+    taskbar.setPlaying(Boolean(state?.isPlaying));
 
     if (before?.title !== state?.title) {
       tickState = null;

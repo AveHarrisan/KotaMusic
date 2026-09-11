@@ -118,7 +118,9 @@ async function main() {
   await fsp.mkdir(OUT, { recursive: true });
   const outAsar = path.join(OUT, `app.asar`);
   await asar.createPackageWithOptions(extracted, outAsar, {
-    unpackDir: '**/node_modules/{sharp,@img}/**/*',
+    // Иконки для панели задач Windows нужны настоящими файлами на диске:
+    // из архива системные вызовы их не читают.
+    unpackDir: '{**/node_modules/{sharp,@img}/**/*,kotamusic/assets}',
   });
 
   const size = (await fsp.stat(outAsar)).size;

@@ -151,6 +151,14 @@ function fill(container) {
 
   container.appendChild(
     row(
+      'Кнопки на панели задач',
+      'Управление из миниатюры окна, только в Windows',
+      toggle(config.taskbarButtons, (value) => update({ taskbarButtons: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
       'Глобальные горячие клавиши',
       'Ctrl+Alt и пробел, стрелки, L — работают поверх других окон',
       toggle(config.hotkeys, (value) => update({ hotkeys: value }))
