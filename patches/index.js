@@ -14,6 +14,7 @@
 /** @type {Patch[]} */
 const patches = [
   require('./settings-ui'),
+  require('./remote-control'),
   require('./preload'),
   {
     id: 'devtools',
