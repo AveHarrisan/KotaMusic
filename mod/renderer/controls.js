@@ -19,16 +19,59 @@ const bar = () =>
   document.querySelector('[data-test-id="PLAYERBAR_DESKTOP"], [data-test-id="VIBE_PLAYERBAR"]') ||
   document;
 
-const find = (ids) => bar().querySelector(ids.map((id) => `[data-test-id="${id}"]`).join(','));
+/**
+ * Нажатие как настоящей мышью. Часть кнопок клиента слушает события
+ * указателя, а не «клик», и на программный click не реагирует.
+ */
+function press(element) {
+  if (!element) return;
 
-/** Сдвигает громкость и уведомляет клиент, будто её тянули мышью. */
-function changeVolume(delta) {
-  const slider = document.querySelector('[data-test-id="CHANGE_VOLUME_SLIDER"]');
+  const box = element.getBoundingClientRect();
+  const options = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
+    button: 0,
+    buttons: 1,
+    clientX: box.left + box.width / 2,
+    clientY: box.top + box.height / 2,
+    pointerId: 1,
+    pointerType: 'mouse',
+    isPrimary: true,
+  };
+
+  element.dispatchEvent(new PointerEvent('pointerdown', options));
+  element.dispatchEvent(new MouseEvent('mousedown', options));
+  element.dispatchEvent(new PointerEvent('pointerup', { ...options, buttons: 0 }));
+  element.dispatchEvent(new MouseEvent('mouseup', { ...options, buttons: 0 }));
+  element.dispatchEvent(new MouseEvent('click', { ...options, buttons: 0 }));
+}
+
+/**
+ * Ищем кнопку плеера, а не такую же кнопку в карточке из списка.
+ * В «Моей волне» часть кнопок вынесена за пределы панели, поэтому
+ * поднимаемся от панели вверх до ближайшего предка, где кнопка есть.
+ */
+function find(ids) {
+  const selector = ids.map((id) => `[data-test-id="${id}"]`).join(',');
+
+  let node = bar();
+  for (let depth = 0; node && depth < 8; depth++) {
+    const found = node.querySelector(selector);
+    if (found) return found;
+    node = node.parentElement;
+  }
+
+  return document.querySelector(selector);
+}
+
+/** Двигает ползунок так, как это делает мышь: через события ввода. */
+function setSliderElement(slider, ratio) {
   if (!slider) return null;
 
   const max = Number(slider.max) || 1;
-  const step = max * delta;
-  const value = Math.min(max, Math.max(0, Number(slider.value) + step));
+  const value = Math.min(max, Math.max(0, max * ratio));
 
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   setter.call(slider, String(value));
@@ -38,15 +81,56 @@ function changeVolume(delta) {
   return value / max;
 }
 
+const setSlider = (selector, ratio) =>
+  setSliderElement(document.querySelector(selector), ratio);
+
+const VOLUME = '[data-test-id="CHANGE_VOLUME_SLIDER"]';
+/** Ползунок времени: в «Моей волне» он лежит рядом с подписью времени. */
+function timecodeSlider() {
+  const direct = document.querySelector('[data-test-id="TIMECODE_SLIDER"]');
+  if (direct) return direct;
+
+  const label = document.querySelector('[data-test-id="VIBE_PLAYERBAR_TIMECODE"]');
+  return label?.parentElement?.querySelector('input[type="range"]') ?? null;
+}
+
+function currentVolume() {
+  const slider = document.querySelector(VOLUME);
+  if (!slider) return 0;
+  return Number(slider.value) / (Number(slider.max) || 1);
+}
+
+function changeVolume(delta) {
+  return setSlider(VOLUME, currentVolume() + delta);
+}
+
 ipcRenderer.on('kotamusic:action', (_event, action) => {
   try {
+    // Команды со значением: громкость и перемотка.
+    if (action && typeof action === 'object') {
+      if (action.type === 'volume') {
+        const level = setSlider(VOLUME, action.value);
+        if (level !== null) showVolume(level);
+      }
+      if (action.type === 'seek') setSliderElement(timecodeSlider(), action.value);
+      return;
+    }
+
     if (action === 'volumeUp' || action === 'volumeDown') {
       const level = changeVolume(action === 'volumeUp' ? 0.05 : -0.05);
       if (level !== null) showVolume(level);
       return;
     }
 
-    find(ID[action])?.click();
+    const button = find(ID[action]);
+    ipcRenderer.send('kotamusic:debug:probe', {
+      действие: action,
+      кнопка: button?.getAttribute('data-test-id') ?? 'не найдена',
+      наПанели: Boolean(bar()?.contains?.(button)),
+      подпись: button?.getAttribute('aria-label') ?? null,
+    });
+
+    press(button);
   } catch (e) {
     console.error('[KotaMusic] не удалось выполнить', action, e);
   }

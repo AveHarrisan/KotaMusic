@@ -36,6 +36,14 @@ const DEFAULTS = {
   // Мини-плеер поверх других окон.
   miniplayer: false,
 
+  // Своё сочетание клавиш для мини-плеера. Пусто — клавиши нет.
+  miniplayerHotkey: '',
+
+  // Что показывать в мини-плеере.
+  miniplayerSeek: true,
+  miniplayerVolume: true,
+  miniplayerClose: true,
+
   // Кнопки управления в миниатюре окна на панели задач Windows.
   taskbarButtons: true,
 

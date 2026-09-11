@@ -55,6 +55,30 @@ function absolute(href) {
   return href.startsWith('http') ? href : WEB_BASE + href;
 }
 
+/** Текущая громкость от 0 до 1. */
+function readVolume() {
+  const slider = document.querySelector('[data-test-id="CHANGE_VOLUME_SLIDER"]');
+  if (!slider) return null;
+
+  const max = Number(slider.max) || 1;
+  const value = Number(slider.value);
+  return Number.isFinite(value) ? value / max : null;
+}
+
+/** Кнопка воспроизведения ближе всего к панели плеера. */
+function nearestControl(bar) {
+  const selector = '[data-test-id="PAUSE_BUTTON"],[data-test-id="PLAY_BUTTON"]';
+
+  let node = bar;
+  for (let depth = 0; node && depth < 8; depth++) {
+    const found = node.querySelector(selector);
+    if (found) return found;
+    node = node.parentElement;
+  }
+
+  return null;
+}
+
 /** «00:08 / 02:50» → секунды. */
 function parseTimecode(value) {
   const parts = String(value || '').split('/');
@@ -108,7 +132,9 @@ function readState() {
   const coverNode = pick(bar, ID.cover);
   const coverUrl = imageFrom(coverNode);
   const slider = pick(bar, ID.slider) || pick(document, ID.slider);
-  const pause = pick(bar, ID.pause) || pick(document, ID.pause);
+  // Состояние читаем по кнопке рядом с панелью: такие же кнопки есть
+  // в карточках на странице, и по ним легко ошибиться.
+  const control = nearestControl(bar);
 
   let position = slider ? Number(slider.value) : NaN;
   let duration = slider ? Number(slider.max) : NaN;
@@ -128,8 +154,10 @@ function readState() {
     trackUrl: absolute(titleEl?.getAttribute('href') || albumLink?.getAttribute('href')),
     artistUrl: absolute(artistLinks[0]?.getAttribute('href')),
     cover: coverUrl,
-    // Кнопка «Пауза» показывается только во время воспроизведения.
-    isPlaying: Boolean(pause),
+    // Кнопка «Пауза» стоит на месте «Воспроизвести», пока идёт музыка.
+    isPlaying: control?.getAttribute('data-test-id') === 'PAUSE_BUTTON',
+    control: control?.getAttribute('data-test-id') ?? null,
+    volume: readVolume(),
     position: Number.isFinite(position) ? position : null,
     duration: Number.isFinite(duration) && duration > 0 ? duration : null,
   };
@@ -157,9 +185,9 @@ function push() {
     return;
   }
 
-  // Позиция меняется каждую секунду — сама по себе она не повод
-  // дёргать Discord, поэтому из сравнения её исключаем.
-  const { position, ...stable } = state || {};
+  // Позиция и громкость меняются часто — сами по себе они не повод
+  // пересобирать статус, поэтому из сравнения их исключаем.
+  const { position, volume, ...stable } = state || {};
   const snapshot = JSON.stringify(stable);
   if (snapshot === last) return;
 
@@ -187,12 +215,14 @@ function push() {
 function tick() {
   try {
     const state = readState();
-    if (!state || !state.isPlaying || !Number.isFinite(state.position)) return;
+    if (!state || !Number.isFinite(state.position)) return;
 
     ipcRenderer.send('kotamusic:player:tick', {
       title: state.title,
       position: state.position,
       duration: state.duration,
+      volume: state.volume,
+      isPlaying: state.isPlaying,
     });
   } catch {}
 }

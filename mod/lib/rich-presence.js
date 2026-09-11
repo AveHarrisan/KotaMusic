@@ -341,6 +341,10 @@ function start() {
   log.setVerbose(settings.get().debug);
   settings.onChange((now) => log.setVerbose(now.debug));
 
+  ipcMain.on('kotamusic:debug:probe', (_event, info) => {
+    log.info('Нажатие:', JSON.stringify(info));
+  });
+
   ipcMain.on('kotamusic:debug:dom', (_event, html) => {
     if (!settings.get().debug) return;
     try {
@@ -362,7 +366,7 @@ function start() {
     // и полосу в Discord надо пересобрать.
     const previous = tickState;
     tickState = { ...data, at: Date.now() };
-    miniplayer.setPosition(data.position);
+    miniplayer.setPosition(data);
 
     if (previous?.title !== data.title) return;
 
@@ -387,6 +391,7 @@ function start() {
     // покажет чужое время, а проверка перемотки ложно сработает.
     tweaks.applySleepBlock(Boolean(state?.isPlaying));
     taskbar.setPlaying(Boolean(state?.isPlaying));
+    require('./player').setPlaying(state?.isPlaying);
     miniplayer.setTrack(state);
 
     if (before?.title !== state?.title) {
@@ -407,6 +412,7 @@ function start() {
       log.info(
         state
           ? `Трек: ${state.title} — ${(state.artists || []).join(', ')} ` +
+              `[кнопка ${state.control}] ` +
               `(${state.isPlaying ? 'играет' : 'пауза'}, ` +
               `${state.position ?? '?'}/${state.duration ?? '?'} с)`
           : 'Плеер пуст'

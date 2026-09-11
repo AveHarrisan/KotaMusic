@@ -24,7 +24,7 @@ let isPlaying = false;
 
 function send(window, action) {
   log.info('Кнопка панели задач:', action);
-  window.webContents.send('kotamusic:action', action);
+  require('./player').perform(action);
 }
 
 /** Набор кнопок зависит от того, играет ли музыка. */
