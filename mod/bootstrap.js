@@ -20,6 +20,20 @@ try {
   require('./lib/taskbar').start();
   require('./lib/miniplayer').start();
   require('./lib/rich-presence').start();
+
+  // Открыть страницу настроек сразу после запуска — удобно для снимков
+  // экрана и проверок. В обычной работе переменная не задана.
+  if (process.env.KOTAMUSIC_OPEN_SETTINGS) {
+    const { app, BrowserWindow } = require('electron');
+
+    app.once('ready', () => {
+      setTimeout(() => {
+        const [window] = BrowserWindow.getAllWindows();
+        window?.webContents.send('desktop:navigation:open-deeplink', '/settings');
+        log.info('Открываю настройки');
+      }, 12000);
+    });
+  }
 } catch (e) {
   log.error('Ошибка запуска мода:', e);
 }
