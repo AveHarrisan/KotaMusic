@@ -117,6 +117,14 @@ function fill(container) {
 
   container.appendChild(
     row(
+      'Время в строке исполнителя',
+      'Единственный способ показать секунды при наведении в голосовом канале',
+      toggle(config.timeInState, (value) => update({ timeInState: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
       'Название трека в списке участников',
       'Вместо названия приложения',
       toggle(config.showTrackInMemberList, (value) =>

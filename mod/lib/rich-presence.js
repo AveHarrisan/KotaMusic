@@ -14,6 +14,7 @@ const log = require('./log');
 const TRACK_CHANNEL = 'kotamusic:player:track';
 
 const RECONNECT_DELAY_MS = 15000;
+const TIME_REFRESH_MS = 10000; // как часто переписываем время в строке исполнителя
 const MIN_INTERVAL_MS = 2000; // Discord ограничивает частоту обновлений
 const SEEK_TOLERANCE_S = 3; // расхождение, после которого считаем это перемоткой
 const CLEAR_GRACE_MS = 6000; // на стыке треков плеер на миг «не играет»
@@ -48,6 +49,13 @@ function webUrl(relative) {
 // Слишком длинная подпись делает статус недоступным для рассылки: свой
 // клиент его рисует, другие участники не видят ничего.
 const BUTTON_LABEL_LIMIT = 32;
+
+/** «0:37» — для строки, которую видно при наведении в канале. */
+function clock(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(total / 60);
+  return `${minutes}:${String(total % 60).padStart(2, '0')}`;
+}
 
 function label(text) {
   const bytes = Buffer.byteLength(text, 'utf8');
@@ -136,6 +144,17 @@ function buildActivity() {
 
   let position = track.position;
   if (fresh) position = fresh.position + (Date.now() - fresh.at) / 1000;
+
+  // В компактной карточке канала Discord время не показывает вовсе:
+  // полосу он рисует только в профиле. Поэтому по желанию дописываем
+  // секунды прямо в строку исполнителя — её видно при наведении.
+  if (settings.get().timeInState && Number.isFinite(position)) {
+    const suffix = Number.isFinite(duration) && duration > 0
+      ? ` · ${clock(position)} / ${clock(duration)}`
+      : ` · ${clock(position)}`;
+
+    activity.state = (artists + suffix).slice(0, 128);
+  }
 
   if (Number.isFinite(position)) {
     const now = Date.now();
@@ -295,6 +314,17 @@ async function connect() {
 }
 
 function start() {
+  // Время в строке исполнителя живёт только пока его переписывают.
+  // Шаг в 10 секунд оставляет двойной запас до ограничения Discord
+  // (примерно пять обновлений за двадцать секунд).
+  setInterval(() => {
+    if (!settings.get().timeInState) return;
+    if (!track?.isPlaying) return;
+
+    lastSent = '';
+    sync();
+  }, TIME_REFRESH_MS);
+
   // Разбор: каждые 40 секунд переходим к следующему варианту кадра.
   if (settings.get().bisect) {
     setInterval(() => {

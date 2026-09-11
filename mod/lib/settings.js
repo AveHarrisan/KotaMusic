@@ -33,6 +33,10 @@ const DEFAULTS = {
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
 
+  // Дописывать время в строку исполнителя: в карточке голосового канала
+  // Discord своего времени не показывает.
+  timeInState: true,
+
   // Перебор вариантов кадра ради поиска мешающего поля.
   bisect: false,
 
