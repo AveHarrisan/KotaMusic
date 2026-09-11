@@ -372,6 +372,11 @@ function fill(container) {
       textField(config.cacheDir || '', (value) => update({ cacheDir: value }))
     ),
     row(
+      'Проверять обновления мода',
+      'Сообщать, когда вышла сборка под свежую версию клиента',
+      toggle(config.updateCheck !== false, (value) => update({ updateCheck: value }))
+    ),
+    row(
       'Подробный журнал',
       'Записывать в файл, что уходит в Discord',
       toggle(config.debug, (value) => update({ debug: value }))

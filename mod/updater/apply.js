@@ -1,0 +1,156 @@
+'use strict';
+// Подмена app.asar после выхода клиента.
+//
+// Пока клиент работает, его собственный архив занят, поэтому мод скачивает
+// новую сборку, а замену выполняет этот сценарий: клиент запускает его
+// отдельным процессом (своим же Electron в режиме Node), закрывается,
+// сценарий дожидается освобождения файла, подменяет архив, обновляет
+// проверку целостности и запускает клиент обратно.
+//
+// Запуск: apply.js <новый asar> <app.asar клиента> <файл целостности>
+//         <исполняемый файл> <pid клиента>
+
+const path = require('path');
+const { spawn } = require('child_process');
+
+const fs = require('./fs');
+const { patchIntegrity } = require('./integrity');
+
+const [source, target, integrityTarget, executable, pid] = process.argv.slice(2);
+
+const log = (...args) => {
+  const line = `[${new Date().toISOString()}] ${args.join(' ')}\n`;
+  try {
+    fs.appendFileSync(path.join(require('os').tmpdir(), 'kotamusic-update.log'), line);
+  } catch {}
+};
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/**
+ * Запуск клиента обратно. Этот сценарий работает под тем же Electron
+ * в режиме Node, и переменную этого режима нельзя передавать дальше —
+ * иначе клиент запустится как обычный Node и сразу закроется.
+ */
+function launch() {
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  delete env.KOTAMUSIC_UPDATE_TEST;
+  delete env.KOTAMUSIC_UPDATE_ASSET;
+
+  spawn(executable, [], { detached: true, stdio: 'ignore', env }).unref();
+}
+
+/** Клиент закрывается не мгновенно — ждём, пока процесс исчезнет. */
+async function waitForExit() {
+  for (let i = 0; i < 60; i += 1) {
+    try {
+      process.kill(Number(pid), 0);
+    } catch {
+      return true;
+    }
+    await sleep(500);
+  }
+
+  return false;
+}
+
+/**
+ * Готовит файл с проверкой целостности к правке.
+ *
+ * Этот сценарий запущен самим клиентом (его Electron в режиме Node),
+ * поэтому его исполняемый файл занят нами же и перезаписать его нельзя.
+ * Windows при этом разрешает такой файл переименовать: уводим занятый
+ * в сторону и правим уже свежую копию под прежним именем.
+ */
+function freeForWrite(file) {
+  try {
+    const fd = fs.openSync(file, 'r+');
+    fs.closeSync(fd);
+    return true;
+  } catch {}
+
+  const moved = `${file}.old`;
+
+  try {
+    if (fs.existsSync(moved)) fs.unlinkSync(moved);
+  } catch {}
+
+  try {
+    fs.renameSync(file, moved);
+    fs.copyFileSync(moved, file);
+    log('занятый файл уведён в', moved);
+    return true;
+  } catch (e) {
+    log('освободить файл не вышло:', e.message);
+    return false;
+  }
+}
+
+/** Файл освобождается позже самого процесса — пробуем, пока не выйдет. */
+async function replace() {
+  for (let i = 0; i < 30; i += 1) {
+    try {
+      fs.copyFileSync(source, target);
+      return true;
+    } catch (e) {
+      log('архив занят:', e.message);
+      await sleep(1000);
+    }
+  }
+
+  return false;
+}
+
+async function main() {
+  log('жду выхода клиента', pid);
+
+  if (!(await waitForExit())) {
+    log('клиент не закрылся, обновление отменено');
+    return;
+  }
+
+  if (!freeForWrite(integrityTarget)) {
+    log('файл целостности занят, обновление отменено');
+    launch();
+    return;
+  }
+
+  const backup = `${target}.before-update`;
+
+  try {
+    fs.copyFileSync(target, backup);
+  } catch (e) {
+    log('не удалось сделать копию:', e.message);
+    return;
+  }
+
+  if (!(await replace())) {
+    log('подменить архив не вышло, возвращаю прежний');
+    try {
+      fs.copyFileSync(backup, target);
+    } catch {}
+    return;
+  }
+
+  try {
+    const result = patchIntegrity(integrityTarget, target);
+    log('проверка целостности:', JSON.stringify(result));
+  } catch (e) {
+    log('целостность не обновилась, возвращаю прежний архив:', e.message);
+    fs.copyFileSync(backup, target);
+    return;
+  }
+
+  log('готово, запускаю клиент');
+
+  launch();
+
+  // Копия занятого файла больше не нужна, но удалить её получится только
+  // когда этот процесс закончится — пробуем при следующем обновлении.
+  try {
+    fs.unlinkSync(`${integrityTarget}.old`);
+  } catch {}
+}
+
+main().catch((e) => log('ошибка:', e.stack || e.message));

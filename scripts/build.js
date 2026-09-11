@@ -61,9 +61,12 @@ async function main() {
   const brandingPath = path.join(extracted, 'kotamusic', 'branding.js');
   const modVersion = require(path.join(ROOT, 'package.json')).version;
   branding.version = modVersion;
+  branding.builtForClient = version;
   await fsp.writeFile(
     brandingPath,
-    (await fsp.readFile(brandingPath, 'utf8')).replace("'0.0.0-dev'", `'${modVersion}'`),
+    (await fsp.readFile(brandingPath, 'utf8'))
+      .replace("'0.0.0-dev'", `'${modVersion}'`)
+      .replace("'0.0.0-dev-client'", `'${version}'`),
     'utf8'
   );
 
@@ -120,7 +123,10 @@ async function main() {
   await asar.createPackageWithOptions(extracted, outAsar, {
     // Иконки для панели задач Windows нужны настоящими файлами на диске:
     // из архива системные вызовы их не читают.
-    unpackDir: '{**/node_modules/{sharp,@img}/**/*,kotamusic/assets}',
+    // Распакованными оставляем только файлы самого клиента: свои картинки
+    // мод раскладывает сам при запуске, и тогда app.asar — единственное,
+    // что нужно подменить при обновлении.
+    unpackDir: '**/node_modules/{sharp,@img}/**/*',
   });
 
   const size = (await fsp.stat(outAsar)).size;

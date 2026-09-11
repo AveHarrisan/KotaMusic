@@ -20,6 +20,7 @@ try {
   require('./lib/taskbar').start();
   require('./lib/miniplayer').start();
   require('./lib/rich-presence').start();
+  require('./lib/updates').start();
 
   // Открыть страницу настроек сразу после запуска — удобно для снимков
   // экрана и проверок. В обычной работе переменная не задана.

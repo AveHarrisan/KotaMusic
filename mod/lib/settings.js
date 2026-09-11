@@ -96,14 +96,12 @@ const DEFAULTS = {
   // Discord своего времени не показывает.
   timeInState: true,
 
-  // Перебор вариантов кадра ради поиска мешающего поля.
-  bisect: false,
-
-  // Собирать статус в точности как старый мод — для сравнения.
-  authorStyle: false,
+  // Проверять, не вышла ли сборка мода под свежий клиент.
+  updateCheck: true,
 
   // Подробный журнал: что уходит в Discord и что он отвечает.
-  debug: true,
+  // Нужен только при разборе неполадок, поэтому выключен.
+  debug: false,
 };
 
 let values = { ...DEFAULTS };
@@ -144,6 +142,8 @@ function load() {
 
   delete values.miniplayerHotkey;
   delete values.useLibrary;
+  delete values.bisect;
+  delete values.authorStyle;
 
   // Неизвестные действия могли появиться в новой версии мода.
   values.hotkeys = { ...DEFAULTS.hotkeys, ...values.hotkeys };

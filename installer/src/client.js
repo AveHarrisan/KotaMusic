@@ -47,6 +47,17 @@ function executableIn(dir) {
   return files.length ? path.join(dir, files[0]) : null;
 }
 
+/**
+ * Файл, в котором лежит проверка целостности: на macOS это Info.plist
+ * рядом с Resources, на остальных системах — сам исполняемый файл.
+ */
+function integrityTargetIn(dir, executable) {
+  if (process.platform !== 'darwin') return executable;
+
+  const plist = path.join(dir, 'Info.plist');
+  return fs.existsSync(plist) ? plist : executable;
+}
+
 function describe(dir) {
   const asar = path.join(dir, 'resources', 'app.asar');
   if (!fs.existsSync(asar)) return null;
@@ -72,6 +83,7 @@ function describe(dir) {
     asar,
     backup,
     executable: executableIn(dir),
+    integrityTarget: integrityTargetIn(dir, executableIn(dir)),
     version,
     installed,
     hasBackup: fs.existsSync(backup),

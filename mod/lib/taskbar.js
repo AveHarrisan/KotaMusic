@@ -2,17 +2,15 @@
 // Кнопки управления в миниатюре окна на панели задач Windows.
 // На других системах такого механизма нет — модуль просто молчит.
 
-const path = require('path');
 const { app, BrowserWindow, nativeImage } = require('electron');
 
 const settings = require('./settings');
+const assets = require('./assets');
 const log = require('./log');
 
-const ICONS = path.join(__dirname, '..', 'assets');
-
-// Внутри собранного клиента файлы лежат распакованными рядом с архивом.
-const iconPath = (name) =>
-  path.join(ICONS.replace('app.asar', 'app.asar.unpacked'), `${name}.png`);
+// Системный вызов читает файл мимо Electron и внутрь архива не заглянет,
+// поэтому берём картинку из разложенной папки.
+const iconPath = (name) => assets.file(`${name}.png`);
 
 function icon(name) {
   const image = nativeImage.createFromPath(iconPath(name));

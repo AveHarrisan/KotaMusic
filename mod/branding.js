@@ -6,6 +6,10 @@ module.exports = {
   name: 'KotaMusic',
   // Проставляется сборкой: внутри asar путь наружу ведёт в файлы клиента.
   version: '0.0.0-dev',
+
+  // Версия клиента, из которой собран этот app.asar. По ней мод понимает,
+  // что клиент обновился и вышла свежая сборка.
+  builtForClient: '0.0.0-dev-client',
   repositoryUrl: 'https://github.com/AveHarrisan/KotaMusic',
   supportUrl: 'https://boosty.to/aveharrisan',
   authorUrl: 'https://t.me/aveharrisan',

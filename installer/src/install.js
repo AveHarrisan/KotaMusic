@@ -9,7 +9,7 @@ const fs = require('./fs');
 const fsp = fs.promises;
 
 const { isRunning } = require('./client');
-const { patchExecutable, headerHash } = require('./integrity');
+const { patchIntegrity, headerHash } = require('./integrity');
 
 async function install(info, modPath) {
   if (isRunning(info)) throw new Error('Яндекс Музыка запущена — закройте её и повторите');
@@ -18,8 +18,10 @@ async function install(info, modPath) {
   if (!fs.existsSync(info.backup)) {
     await fsp.copyFile(info.asar, info.backup);
   }
-  if (info.executable && !fs.existsSync(info.executable + '.original')) {
-    await fsp.copyFile(info.executable, info.executable + '.original');
+  const target = info.integrityTarget || info.executable;
+
+  if (target && !fs.existsSync(target + '.original')) {
+    await fsp.copyFile(target, target + '.original');
   }
 
   await fsp.copyFile(modPath, info.asar);
@@ -32,9 +34,9 @@ async function install(info, modPath) {
   }
 
   // Windows и macOS проверяют целостность архива — обновляем хеш.
-  if (info.executable) {
+  if (target) {
     try {
-      const result = patchExecutable(info.executable, info.asar);
+      const result = patchIntegrity(target, info.asar);
       if (result.absent) {
         // Проверки целостности нет — так бывает на Linux, это нормально.
       }
@@ -55,9 +57,12 @@ async function uninstall(info) {
 
   await fsp.copyFile(info.backup, info.asar);
 
-  const originalExe = info.executable && info.executable + '.original';
-  if (originalExe && fs.existsSync(originalExe)) {
-    await fsp.copyFile(originalExe, info.executable);
+  // Возвращаем и файл с проверкой целостности: на macOS это Info.plist.
+  const target = info.integrityTarget || info.executable;
+  const original = target && target + '.original';
+
+  if (original && fs.existsSync(original)) {
+    await fsp.copyFile(original, target);
   }
 }
 
