@@ -67,6 +67,63 @@ function textField(value, onChange) {
   return input;
 }
 
+/** Поле, которое запоминает нажатое сочетание клавиш. */
+function hotkeyField(value, onChange) {
+  const button = el(
+    'button',
+    'flex:none;min-width:190px;padding:8px 10px;border-radius:8px;cursor:pointer;' +
+      'text-align:center;font-size:13px;color:inherit;' +
+      'border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06)'
+  );
+  button.type = 'button';
+  button.textContent = value || 'Не задано';
+
+  let listening = false;
+
+  const stop = () => {
+    listening = false;
+    button.textContent = value || 'Не задано';
+    document.removeEventListener('keydown', onKey, true);
+  };
+
+  function onKey(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.key === 'Escape') return stop();
+
+    // Одни модификаторы сочетанием не считаются.
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return;
+
+    const parts = [];
+    if (event.ctrlKey) parts.push('Control');
+    if (event.altKey) parts.push('Alt');
+    if (event.shiftKey) parts.push('Shift');
+    if (event.metaKey) parts.push('Super');
+
+    if (event.key === 'Backspace' && !parts.length) {
+      stop();
+      return onChange('');
+    }
+
+    const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+    parts.push(key);
+
+    stop();
+    onChange(parts.join('+'));
+  }
+
+  button.addEventListener('click', () => {
+    if (listening) return stop();
+
+    listening = true;
+    button.textContent = 'Нажмите сочетание…';
+    document.addEventListener('keydown', onKey, true);
+  });
+
+  return button;
+}
+
 function row(title, description, control) {
   const wrap = el('div', 'display:flex;align-items:center;gap:16px;padding:12px 0');
   const texts = el('div', 'flex:1;min-width:0');
@@ -152,8 +209,40 @@ function fill(container) {
   container.appendChild(
     row(
       'Мини-плеер',
-      'Маленькое окно поверх других, Ctrl+Alt+M',
+      'Маленькое окно поверх других',
       toggle(config.miniplayer, (value) => update({ miniplayer: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Перемотка в мини-плеере',
+      'Щелчок по полосе задаёт позицию в треке',
+      toggle(config.miniplayerSeek, (value) => update({ miniplayerSeek: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Громкость в мини-плеере',
+      'Ползунок рядом с кнопками',
+      toggle(config.miniplayerVolume, (value) => update({ miniplayerVolume: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Кнопка закрытия мини-плеера',
+      'Крестик в углу окна',
+      toggle(config.miniplayerClose, (value) => update({ miniplayerClose: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Клавиша мини-плеера',
+      'Нажмите поле и задайте сочетание. Backspace убирает',
+      hotkeyField(config.miniplayerHotkey, (value) => update({ miniplayerHotkey: value }))
     )
   );
 

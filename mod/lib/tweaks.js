@@ -26,7 +26,12 @@ function applyCacheDir() {
 function applyZoom() {
   const percent = Number(settings.get().zoom) || 100;
 
-  const windows = BrowserWindow.getAllWindows();
+  // Масштаб касается только окна клиента: свои окна мода рисуются
+  // в своих размерах, их сжимать незачем.
+  const windows = BrowserWindow.getAllWindows().filter(
+    (window) => window.getTitle?.() !== 'KotaMusic'
+  );
+
   for (const window of windows) {
     // Electron считает масштаб множителем, а людям привычнее проценты.
     window.webContents.setZoomFactor(percent / 100);

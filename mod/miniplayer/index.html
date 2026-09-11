@@ -74,13 +74,29 @@
 
   button:hover { background: rgba(255, 255, 255, 0.12); }
 
-  #progress {
+  /* Зона нажатия шире самой полоски — иначе в неё не попасть. */
+  #seek {
     grid-column: 1 / -1;
+    padding: 7px 0;
+    -webkit-app-region: no-drag;
+  }
+
+  #seek[data-seekable] { cursor: pointer; }
+
+  #progress {
     height: 3px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.15);
     overflow: hidden;
   }
+
+  #volume {
+    width: 68px;
+    accent-color: var(--accent);
+    -webkit-app-region: no-drag;
+  }
+
+  [hidden] { display: none !important; }
 
   #progress > i {
     display: block;
@@ -90,6 +106,19 @@
     transition: width 1s linear;
   }
 
+  #close {
+    position: fixed;
+    top: 6px;
+    right: 8px;
+    padding: 2px 6px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--muted);
+    -webkit-app-region: no-drag;
+  }
+
+  #close:hover { color: var(--text); background: rgba(255,255,255,.12); }
+
   #time {
     color: var(--muted);
     font-size: 11px;
@@ -97,6 +126,8 @@
     -webkit-app-region: drag;
   }
 </style>
+
+<button id="close" title="Закрыть мини-плеер">✕</button>
 
 <img id="cover" alt="" />
 
@@ -108,10 +139,11 @@
     <button data-action="previous" title="Предыдущий">⏮</button>
     <button data-action="play" title="Пауза или воспроизведение" id="play">⏸</button>
     <button data-action="next" title="Следующий">⏭</button>
+    <input id="volume" type="range" min="0" max="1" step="0.01" title="Громкость" />
     <span id="time"></span>
   </div>
 </div>
 
-<div id="progress"><i></i></div>
+<div id="seek"><div id="progress"><i></i></div></div>
 
 <script src="./renderer.js"></script>
