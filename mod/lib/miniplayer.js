@@ -213,17 +213,16 @@ function setPosition(tick) {
 function start() {
   ipcMain.on('kotamusic:miniplayer:ready', () => push());
 
-  // Кнопка в заголовке клиента.
+  // Кнопка в углу страницы: открывает мини-плеер и закрывает его.
   ipcMain.on('kotamusic:miniplayer:show', () => {
-    log.debug('Мини-плеер вызван кнопкой в заголовке');
-
     if (alive()) {
-      window.show();
-      window.focus();
+      settings.set({ miniplayer: false });
+      log.info('Мини-плеер закрыт кнопкой');
       return;
     }
 
     settings.set({ miniplayer: true });
+    log.info('Мини-плеер открыт кнопкой');
   });
 
   // Закрытие окна — это выключение мини-плеера, чтобы он не возвращался

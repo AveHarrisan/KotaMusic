@@ -8,25 +8,80 @@
 const { ipcRenderer } = require('electron');
 
 const MARK = 'kotamusic-miniplayer-button';
+const LOCK_MARK = 'kotamusic-miniplayer-lock';
 const VERSION = /^\d+\.\d+\.\d+$/;
+
+// Пока плеер не нарисован, интерфейс клиента ещё собирается — до этого
+// момента на странице нам делать нечего.
+const PLAYERBAR = '[data-test-id="PLAYERBAR_DESKTOP"],[data-test-id="VIBE_PLAYERBAR"]';
+const PLAY_CONTROL = '[data-test-id="PLAY_BUTTON"],[data-test-id="PAUSE_BUTTON"]';
+
+// Замок рисуем сами: у эмодзи открытый и закрытый висят почти одинаково.
+const LOCK_ICON = (closed) =>
+  '<svg width="11" height="13" viewBox="0 0 11 13" fill="none" aria-hidden="true">' +
+  (closed
+    ? '<path d="M2.6 5V3.4a2.9 2.9 0 0 1 5.8 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/>'
+    : '<path d="M2.6 5V3.4a2.9 2.9 0 0 1 5.6-1" stroke="currentColor" stroke-width="1.4" fill="none"/>') +
+  '<rect x="1" y="5" width="9" height="7" rx="1.6" fill="currentColor"/></svg>';
 
 // Отступ от плашки версии.
 const GAP = 8;
 
+/** Сколько размеченных элементов клиента реально видно на экране. */
+function visibleCount() {
+  let count = 0;
+
+  for (const node of document.querySelectorAll('[data-test-id]')) {
+    const rect = node.getBoundingClientRect();
+
+    if (rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight && rect.bottom > 0) {
+      count += 1;
+    }
+
+    if (count >= 12) break;
+  }
+
+  return count;
+}
+
 let enabled = true;
 let button = null;
+let lock = null;
+let locked = false;
 
-/** Плашка с версией клиента в правом нижнем углу. */
+/**
+ * Плашка с версией клиента в правом нижнем углу. Номер лежит во вложенном
+ * узле, а фон и скругление — на внешнем, поэтому поднимаемся до того
+ * предка, который и есть видимая плашка.
+ */
 function versionBadge() {
   for (const node of document.body.querySelectorAll('div, span, p')) {
     if (node.children.length) continue;
-    if (VERSION.test(node.textContent.trim())) return node;
+    if (!VERSION.test(node.textContent.trim())) continue;
+
+    let badge = node;
+
+    for (let i = 0; i < 3; i += 1) {
+      const parent = badge.parentElement;
+      if (!parent || parent === document.body) break;
+      if (parent.textContent.trim() !== node.textContent.trim()) break;
+
+      const background = getComputedStyle(parent).backgroundColor;
+      badge = parent;
+
+      if (background && background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') break;
+    }
+
+    return badge;
   }
 
   return null;
 }
 
-/** Держим кнопку слева от плашки; если плашки нет — просто в углу. */
+/**
+ * Держим кнопку слева от плашки и в точности такой же: размер, скругление
+ * и шрифт берём у самой плашки, чтобы пара выглядела единым целым.
+ */
 function place() {
   if (!button) return;
 
@@ -39,9 +94,36 @@ function place() {
   }
 
   const rect = badge.getBoundingClientRect();
+  const style = getComputedStyle(badge);
+  const height = Math.round(rect.height);
+
+  for (const node of [button, lock]) {
+    if (!node) continue;
+    node.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
+    node.style.height = `${height}px`;
+
+    // Скругление как у плашки, но не меньше полной «таблетки».
+    node.style.borderRadius = `${Math.max(parseFloat(style.borderRadius) || 0, height / 2)}px`;
+
+    // Шрифт берём у плашки целиком, вместе с размером и начертанием.
+    node.style.font = style.font;
+    node.style.fontFamily = style.fontFamily;
+    node.style.fontSize = style.fontSize;
+    node.style.fontWeight = style.fontWeight;
+    node.style.lineHeight = style.lineHeight;
+    node.style.letterSpacing = style.letterSpacing;
+  }
+
   button.style.right = `${Math.round(window.innerWidth - rect.left + GAP)}px`;
-  button.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
-  button.style.height = `${Math.round(rect.height)}px`;
+  button.style.paddingLeft = style.paddingLeft;
+  button.style.paddingRight = style.paddingRight;
+
+  if (lock) {
+    const width = button.getBoundingClientRect().width || 0;
+    lock.style.right = `${Math.round(window.innerWidth - rect.left + GAP * 2 + width)}px`;
+    lock.style.width = `${height}px`;
+    lock.style.padding = '0';
+  }
 }
 
 function build() {
@@ -50,15 +132,15 @@ function build() {
   button = document.createElement('button');
   button.setAttribute(`data-${MARK}`, '1');
   button.type = 'button';
-  button.textContent = '!';
-  button.title = 'Мини-плеер';
+  button.textContent = 'Мини-плеер';
+  button.title = 'Открыть или закрыть мини-плеер';
 
   button.style.cssText =
     'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
-    'min-width:26px;height:22px;padding:0 6px;border-radius:6px;' +
+    'height:22px;padding:0 12px;border-radius:6px;white-space:nowrap;' +
     'display:flex;align-items:center;justify-content:center;' +
     'border:none;background:rgba(255,255,255,.1);cursor:pointer;' +
-    'font:700 13px/1 system-ui,sans-serif;color:rgba(255,255,255,.75);' +
+    'color:rgba(255,255,255,.75);' +
     'transition:background .12s,color .12s;-webkit-app-region:no-drag';
 
   button.addEventListener('mouseenter', () => {
@@ -74,7 +156,54 @@ function build() {
   button.addEventListener('click', () => ipcRenderer.send('kotamusic:miniplayer:show'));
 
   document.body.appendChild(button);
+  buildLock();
   place();
+}
+
+/** Замок слева от кнопки: фиксирует мини-плеер и делает его прозрачным. */
+function buildLock() {
+  if (document.querySelector(`[data-${LOCK_MARK}]`)) return;
+
+  lock = document.createElement('button');
+  lock.setAttribute(`data-${LOCK_MARK}`, '1');
+  lock.type = 'button';
+
+  lock.style.cssText =
+    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'height:22px;border-radius:6px;' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'border:none;background:rgba(255,255,255,.1);cursor:pointer;' +
+    'color:rgba(255,255,255,.75);' +
+    'transition:background .12s,color .12s;-webkit-app-region:no-drag';
+
+  lock.addEventListener('mouseenter', () => (lock.style.background = 'rgba(255,255,255,.22)'));
+  lock.addEventListener('mouseleave', () => {
+    lock.style.background = lock.dataset.locked === '1' ? 'rgba(255,219,77,.18)' : 'rgba(255,255,255,.1)';
+  });
+
+  lock.addEventListener('click', () => {
+    setLocked(!locked);
+    ipcRenderer.invoke('kotamusic:settings:set', { miniplayerLocked: locked });
+  });
+
+  document.body.appendChild(lock);
+  setLocked(locked);
+}
+
+function setLocked(value) {
+  locked = Boolean(value);
+
+  if (!lock) return;
+
+  lock.innerHTML = LOCK_ICON(locked);
+
+  // Состояние видно и по цвету: закреплён — жёлтый, открыт — приглушённый.
+  lock.style.color = locked ? '#ffdb4d' : 'rgba(255,255,255,.45)';
+  lock.dataset.locked = locked ? '1' : '0';
+  lock.style.background = locked ? 'rgba(255,219,77,.18)' : 'rgba(255,255,255,.1)';
+  lock.title = locked
+    ? 'Мини-плеер закреплён и не ловит нажатия: снять фиксацию'
+    : 'Закрепить мини-плеер: станет прозрачным и перестанет ловить нажатия';
 }
 
 /** Короткая подсказка о кнопке — показывается один раз. */
@@ -89,8 +218,8 @@ function showHint() {
 
   hint.innerHTML =
     '<b style="display:block;margin-bottom:4px">KotaMusic</b>' +
-    'Кнопка <b>!</b> рядом с версией открывает мини-плеер — маленькое окно ' +
-    'поверх остальных. Оно запоминает, куда вы его поставили.';
+    'Кнопка <b>Мини-плеер</b> рядом с версией открывает и закрывает ' +
+    'маленькое окно поверх остальных. Оно запоминает, куда вы его поставили.';
 
   document.body.appendChild(hint);
   requestAnimationFrame(() => (hint.style.opacity = '1'));
@@ -109,23 +238,53 @@ function start() {
     enabled = state?.values?.miniplayerButton !== false;
     if (!enabled) return;
 
-    build();
+    locked = Boolean(state?.values?.miniplayerLocked);
 
-    // Подсказку показываем один раз: дальше она только мешала бы.
-    if (!state.values.hintShown) {
-      setTimeout(showHint, 2500);
-      ipcRenderer.invoke('kotamusic:settings:set', { hintShown: true });
-    }
+    // Пока клиент не нарисовал свой интерфейс, лезть на страницу незачем:
+    // ждём и плашку версии, и панель плеера.
+    const waitingSince = Date.now();
 
-    // Клиент перерисовывает страницу целиком при переходах — возвращаем
-    // кнопку на место и заново примеряемся к плашке версии.
-    new MutationObserver(() => {
-      if (!enabled) return;
+    const ready = setInterval(() => {
+      // Страховка: если клиент разметку поменяет, кнопку всё равно покажем.
+      const waitedTooLong = Date.now() - waitingSince > 25000;
+
+      const bar = document.querySelector(PLAYERBAR);
+
+      // Плашка версии и панель плеера появляются раньше, чем клиент
+      // дорисовывает окно. Ждём живую панель с кнопкой воспроизведения
+      // и боковое меню — к этому моменту интерфейс уже собран.
+      if (!versionBadge()) return;
+
+      if (!waitedTooLong) {
+        if (document.readyState !== 'complete') return;
+        if (!bar || !bar.offsetHeight) return;
+        if (!bar.querySelector(PLAY_CONTROL)) return;
+
+        // На заставке разметка клиента уже есть, но ничего не показано.
+        // Считаем именно видимые элементы: их становится много только
+        // после того, как окно нарисовано целиком.
+        if (visibleCount() < 12) return;
+      }
+
+      clearInterval(ready);
       build();
-      place();
-    }).observe(document.body, { childList: true, subtree: true });
 
-    window.addEventListener('resize', place);
+      // Подсказку показываем один раз: дальше она только мешала бы.
+      if (!state.values.hintShown) {
+        setTimeout(showHint, 1500);
+        ipcRenderer.invoke('kotamusic:settings:set', { hintShown: true });
+      }
+
+      // Клиент перерисовывает страницу целиком при переходах — возвращаем
+      // кнопку на место и заново примеряемся к плашке версии.
+      new MutationObserver(() => {
+        if (!enabled) return;
+        build();
+        place();
+      }).observe(document.body, { childList: true, subtree: true });
+
+      window.addEventListener('resize', place);
+    }, 200);
   });
 }
 
