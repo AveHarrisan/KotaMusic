@@ -18,6 +18,7 @@ try {
   require('./lib/tweaks').start();
   require('./lib/hotkeys').start();
   require('./lib/taskbar').start();
+  require('./lib/miniplayer').start();
   require('./lib/rich-presence').start();
 } catch (e) {
   log.error('Ошибка запуска мода:', e);

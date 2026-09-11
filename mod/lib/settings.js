@@ -33,6 +33,9 @@ const DEFAULTS = {
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
 
+  // Мини-плеер поверх других окон.
+  miniplayer: false,
+
   // Кнопки управления в миниатюре окна на панели задач Windows.
   taskbarButtons: true,
 
