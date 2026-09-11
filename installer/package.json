@@ -17,18 +17,18 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "KotaMusic-Setup-${version}.${ext}",
+      "artifactName": "KotaMusic-Setup.${ext}",
       "icon": "build/icon.png"
     },
     "mac": {
       "target": "dmg",
-      "artifactName": "KotaMusic-${version}.${ext}",
+      "artifactName": "KotaMusic.${ext}",
       "icon": "build/icon.png",
       "category": "public.app-category.utilities"
     },
     "linux": {
       "target": "AppImage",
-      "artifactName": "KotaMusic-${version}.${ext}",
+      "artifactName": "KotaMusic.${ext}",
       "icon": "build/icon.png",
       "category": "Utility"
     },
@@ -36,7 +36,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "artifactName": "KotaMusic-Setup-${version}.${ext}",
+      "artifactName": "KotaMusic-Setup.${ext}",
       "shortcutName": "KotaMusic",
       "uninstallDisplayName": "KotaMusic"
     },

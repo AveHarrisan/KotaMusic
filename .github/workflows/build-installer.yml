@@ -6,8 +6,6 @@ on:
   push:
     tags:
       - 'installer-v*'
-    paths:
-      - 'installer/**'
 
 jobs:
   build:
@@ -65,9 +63,10 @@ jobs:
             installer/dist/*.AppImage
           if-no-files-found: warn
 
+  # Релиз установщика держим под одним тегом: тогда ссылка на файл
+  # не меняется от версии к версии и её можно давать людям как есть.
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/installer-v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -79,6 +78,18 @@ jobs:
       - name: Выложить релиз
         uses: softprops/action-gh-release@v2
         with:
-          name: Установщик ${{ github.ref_name }}
+          tag_name: installer
+          name: Установщик KotaMusic
+          body: |
+            Установщик KotaMusic: находит клиент Яндекс Музыки, ставит мод
+            и умеет вернуть всё назад. Если клиента нет — предложит
+            поставить его с сайта Яндекса.
+
+            - Windows — `KotaMusic-Setup.exe`
+            - Linux — `KotaMusic.AppImage`
+            - macOS — `KotaMusic.dmg` (без проверки, машины нет)
+
+            Мод после установки обновляет себя сам, установщик больше
+            не нужен.
           files: artifacts/**/*
           fail_on_unmatched_files: true

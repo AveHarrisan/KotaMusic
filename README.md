@@ -11,11 +11,15 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 [![Русский](https://img.shields.io/badge/Язык-Русский-blue?style=flat-square)](README.md)
 [![English](https://img.shields.io/badge/Language-English-lightgrey?style=flat-square)](docs/en/README.md)
 
+### Скачать установщик
+
+[![Windows](https://img.shields.io/badge/Скачать_для-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic-Setup.exe)
+[![Linux](https://img.shields.io/badge/Скачать_для-Linux-F1502F?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.AppImage)
+[![macOS](https://img.shields.io/badge/Скачать_для-macOS_(без_проверки)-777777?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.dmg)
+
 [![Загрузок](https://img.shields.io/github/downloads/AveHarrisan/KotaMusic/total?label=Загрузок&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
-[![Последняя сборка](https://img.shields.io/github/v/release/AveHarrisan/KotaMusic?label=Сборка&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
-![Windows](https://img.shields.io/badge/Windows-поддерживается-blue?style=flat-square)
-![Linux](https://img.shields.io/badge/Linux-поддерживается-blue?style=flat-square)
-![macOS](https://img.shields.io/badge/macOS-в_работе-lightgrey?style=flat-square)
+[![Последняя сборка](https://img.shields.io/github/v/release/AveHarrisan/KotaMusic?label=Сборка_мода&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
+[![Все файлы](https://img.shields.io/badge/Все_файлы-релизы-lightgrey?style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
 
 </div>
 
@@ -27,7 +31,9 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 
 ## Установка
 
-1. Скачайте установщик KotaMusic со [страницы релизов](https://github.com/AveHarrisan/KotaMusic/releases)
+1. Скачайте установщик: **[Windows](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic-Setup.exe)** ·
+   [Linux](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.AppImage) ·
+   [macOS](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.dmg)
 2. Закройте Яндекс Музыку и запустите установщик
 3. Нажмите «Установить» и дождитесь окончания
 
