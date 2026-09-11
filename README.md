@@ -7,6 +7,10 @@
 Discord Rich Presence, мини-плеер, горячие клавиши и другие мелочи,
 которых не хватает обычному клиенту.
 
+[![Discord](https://img.shields.io/badge/Discord-Сервер-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/XYBvdvfv8t)
+[![Русский](https://img.shields.io/badge/Язык-Русский-blue?style=flat-square)](README.md)
+[![English](https://img.shields.io/badge/Language-English-lightgrey?style=flat-square)](docs/en/README.md)
+
 [![Загрузок](https://img.shields.io/github/downloads/AveHarrisan/KotaMusic/total?label=Загрузок&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
 [![Последняя сборка](https://img.shields.io/github/v/release/AveHarrisan/KotaMusic?label=Сборка&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
 ![Windows](https://img.shields.io/badge/Windows-поддерживается-blue?style=flat-square)
@@ -182,6 +186,15 @@ docs/       план работ и картинки
 
 Планы и то, что уже сделано — в [docs/ROADMAP.md](docs/ROADMAP.md).
 Нашли ошибку или хотите функцию — [заведите задачу](https://github.com/AveHarrisan/KotaMusic/issues).
+
+## Вопросы и общение
+
+Сервер в Discord — **[discord.com/invite/XYBvdvfv8t](https://discord.com/invite/XYBvdvfv8t)**.
+Там же можно рассказать об ошибке, если не хочется заводить задачу.
+
+Мод продолжает идею закрытого проекта **YandexMusicModClient**: тот же круг
+возможностей, но своя реализация и автоматические сборки под свежие версии
+клиента.
 
 ## Поддержать
 
