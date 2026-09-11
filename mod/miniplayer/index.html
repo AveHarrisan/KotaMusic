@@ -123,6 +123,22 @@
 
   [hidden] { display: none !important; }
 
+  /* Закреплённое окно нажатий не ловит, поэтому кнопки в нём прячем —
+     остаются обложка, название, время и полоса. Управление плавно
+     возвращается, когда фиксацию снимают. */
+  .controls button,
+  #volume,
+  #close {
+    transition: opacity .18s;
+  }
+
+  body.locked .controls button,
+  body.locked #volume,
+  body.locked #close {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* Кружок показывает, куда попадёт перемотка. */
   #seek-knob {
     position: absolute;

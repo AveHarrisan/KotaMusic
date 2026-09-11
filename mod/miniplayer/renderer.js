@@ -160,6 +160,10 @@ ipcRenderer.on('kotamusic:miniplayer:options', (_event, next) => {
 
 ipcRenderer.on('kotamusic:miniplayer:lock', (_event, state) => {
   el('countdown').textContent = state.remaining ? `${state.remaining} с` : '';
+
+  // Закреплённое окно нажатий не ловит, поэтому и кнопки в нём не нужны:
+  // прячем их, а при временной разблокировке плавно возвращаем.
+  document.body.classList.toggle('locked', Boolean(state.locked));
 });
 
 // Подсветка места перемотки: кружок следует за курсором.
