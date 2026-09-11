@@ -151,6 +151,14 @@ function fill(container) {
 
   container.appendChild(
     row(
+      'Мини-плеер',
+      'Маленькое окно поверх других, Ctrl+Alt+M',
+      toggle(config.miniplayer, (value) => update({ miniplayer: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
       'Кнопки на панели задач',
       'Управление из миниатюры окна, только в Windows',
       toggle(config.taskbarButtons, (value) => update({ taskbarButtons: value }))

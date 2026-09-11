@@ -1,0 +1,117 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>KotaMusic</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --text: #fff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --accent: #ffdb4d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 12px;
+    padding: 10px;
+    font: 13px/1.3 system-ui, sans-serif;
+    color: var(--text);
+    background: #1a1a1a;
+    /* Окно без рамки — тянем его за любое пустое место. */
+    -webkit-app-region: drag;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  #cover {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #2a2a2a;
+    align-self: center;
+    justify-self: center;
+  }
+
+  .meta { min-width: 0; align-self: center; }
+
+  #title {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #artist {
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    -webkit-app-region: no-drag;
+  }
+
+  button {
+    all: unset;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  button:hover { background: rgba(255, 255, 255, 0.12); }
+
+  #progress {
+    grid-column: 1 / -1;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.15);
+    overflow: hidden;
+  }
+
+  #progress > i {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--accent);
+    transition: width 1s linear;
+  }
+
+  #time {
+    color: var(--muted);
+    font-size: 11px;
+    margin-left: auto;
+    -webkit-app-region: drag;
+  }
+</style>
+
+<img id="cover" alt="" />
+
+<div class="meta">
+  <div id="title">Ничего не играет</div>
+  <div id="artist"></div>
+
+  <div class="controls">
+    <button data-action="previous" title="Предыдущий">⏮</button>
+    <button data-action="play" title="Пауза или воспроизведение" id="play">⏸</button>
+    <button data-action="next" title="Следующий">⏭</button>
+    <span id="time"></span>
+  </div>
+</div>
+
+<div id="progress"><i></i></div>
+
+<script src="./renderer.js"></script>

@@ -10,6 +10,7 @@ const album = require('./album');
 const settings = require('./settings');
 const tweaks = require('./tweaks');
 const taskbar = require('./taskbar');
+const miniplayer = require('./miniplayer');
 const bisect = require('./bisect');
 const log = require('./log');
 
@@ -361,6 +362,7 @@ function start() {
     // и полосу в Discord надо пересобрать.
     const previous = tickState;
     tickState = { ...data, at: Date.now() };
+    miniplayer.setPosition(data.position);
 
     if (previous?.title !== data.title) return;
 
@@ -385,6 +387,7 @@ function start() {
     // покажет чужое время, а проверка перемотки ложно сработает.
     tweaks.applySleepBlock(Boolean(state?.isPlaying));
     taskbar.setPlaying(Boolean(state?.isPlaying));
+    miniplayer.setTrack(state);
 
     if (before?.title !== state?.title) {
       tickState = null;

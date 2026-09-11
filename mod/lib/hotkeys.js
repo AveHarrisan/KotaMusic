@@ -15,9 +15,15 @@ const DEFAULTS = {
   'Control+Alt+Up': 'volumeUp',
   'Control+Alt+Down': 'volumeDown',
   'Control+Alt+L': 'like',
+  'Control+Alt+M': 'miniplayer',
 };
 
 function send(action) {
+  if (action === 'miniplayer') {
+    log.info('Горячая клавиша: мини-плеер');
+    return require('./miniplayer').toggle();
+  }
+
   const [window] = BrowserWindow.getAllWindows();
   if (!window) return;
 
