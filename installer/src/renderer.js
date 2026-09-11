@@ -28,7 +28,11 @@ function render(state) {
 
   // Клиента нет — предлагаем поставить его с сайта Яндекса, и тогда
   // главная кнопка окна именно эта.
+  // Пока клиента нет — ставим его с выбором папки. Когда он уже стоит,
+  // установщик Яндекса папку не спрашивает, поэтому для переезда
+  // предлагаем сначала удалить клиент.
   el('install-client').hidden = Boolean(state.client);
+  el('uninstall-client').hidden = !state.client;
   el('pick').hidden = Boolean(state.client);
 
   // Сборку мода не видно — даём повторить попытку, не перезапуская окно.
@@ -99,6 +103,26 @@ el('install-client').addEventListener('click', async () => {
 el('retry').addEventListener('click', async () => {
   setStatus('Проверяем…');
   render(await ipcRenderer.invoke('installer:state'));
+});
+
+el('uninstall-client').addEventListener('click', async () => {
+  el('uninstall-client').disabled = true;
+  setStatus('Удаляем Яндекс Музыку…');
+
+  const result = await ipcRenderer.invoke('installer:uninstall-client');
+  el('uninstall-client').disabled = false;
+
+  if (result.ok) {
+    setStatus('Яндекс Музыка удалена. Теперь можно поставить её в другую папку.', 'done');
+  } else if (result.error) {
+    setStatus(result.error, 'error');
+  } else {
+    setStatus('Удаление отменено.');
+  }
+
+  const state = await ipcRenderer.invoke('installer:state');
+  render(state);
+  if (!state.client) watchForClient();
 });
 
 el('pick').addEventListener('click', async () => {

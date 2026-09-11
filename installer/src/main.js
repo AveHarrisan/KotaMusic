@@ -16,7 +16,7 @@ let currentRelease = null;
 function create() {
   window = new BrowserWindow({
     width: 520,
-    height: 470,
+    height: 540,
     resizable: false,
     title: 'KotaMusic',
     backgroundColor: '#161616',
@@ -156,7 +156,57 @@ async function pickFolder() {
   return { ok: true, dir: found.dir };
 }
 
+/**
+ * Удаление клиента: пока он стоит, установщик Яндекса не спрашивает папку,
+ * поэтому сменить место можно только через удаление и установку заново.
+ */
+async function doUninstallClient() {
+  const found = client.find();
+  if (!found) return { ok: false, error: 'Яндекс Музыка не найдена' };
+
+  if (client.isRunning(found)) {
+    return { ok: false, error: 'Яндекс Музыка запущена — закройте её и повторите' };
+  }
+
+  if (!found.uninstaller) {
+    return { ok: false, error: 'Рядом с клиентом нет программы удаления' };
+  }
+
+  const answer = await dialog.showMessageBox(window, {
+    type: 'warning',
+    buttons: ['Удалить', 'Отмена'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Удалить Яндекс Музыку',
+    message: `Удалить Яндекс Музыку из ${found.dir}?`,
+    detail:
+      'Мод удалится вместе с клиентом. После удаления можно поставить ' +
+      'клиент заново и выбрать другую папку.',
+  });
+
+  if (answer.response !== 0) return { ok: false };
+
+  try {
+    await new Promise((done, fail) => {
+      const child = spawn(found.uninstaller, ['/S', '/currentuser'], { stdio: 'ignore' });
+      child.on('exit', () => done());
+      child.on('error', fail);
+    });
+
+    // Программа удаления работает не мгновенно — ждём, пока папка исчезнет.
+    for (let i = 0; i < 20 && client.find(); i += 1) {
+      await new Promise((done) => setTimeout(done, 500));
+    }
+
+    client.remember('');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 ipcMain.handle('installer:state', readState);
+ipcMain.handle('installer:uninstall-client', doUninstallClient);
 ipcMain.handle('installer:pick-folder', pickFolder);
 ipcMain.handle('installer:install-client', doInstallClient);
 ipcMain.handle('installer:install', doInstall);

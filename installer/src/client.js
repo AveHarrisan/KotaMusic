@@ -137,6 +137,19 @@ function integrityTargetIn(dir, executable) {
   return fs.existsSync(plist) ? plist : executable;
 }
 
+/** Программа удаления клиента — её кладёт рядом сам установщик Яндекса. */
+function uninstallerIn(dir) {
+  try {
+    const found = fs
+      .readdirSync(dir)
+      .find((name) => /^uninstall/i.test(name) && name.toLowerCase().endsWith('.exe'));
+
+    return found ? path.join(dir, found) : null;
+  } catch {
+    return null;
+  }
+}
+
 function describe(dir) {
   const asar = path.join(dir, 'resources', 'app.asar');
   if (!fs.existsSync(asar)) return null;
@@ -162,6 +175,7 @@ function describe(dir) {
     asar,
     backup,
     executable: executableIn(dir),
+    uninstaller: uninstallerIn(dir),
     integrityTarget: integrityTargetIn(dir, executableIn(dir)),
     version,
     installed,
