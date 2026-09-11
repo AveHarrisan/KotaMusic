@@ -139,6 +139,11 @@
     pointer-events: none;
   }
 
+  /* Закреплённому окну система всё равно шлёт движения курсора, поэтому
+     подсветку перемотки гасим явно — иначе кружок бегает по полосе. */
+  body.locked #seek { pointer-events: none; }
+  body.locked #seek-knob { opacity: 0 !important; }
+
   /* Кружок показывает, куда попадёт перемотка. */
   #seek-knob {
     position: absolute;
