@@ -52,9 +52,23 @@ function update(position) {
     : '0';
 }
 
+let volumeTimer = null;
+
+/** Ползунок громкости прячется сам, чтобы не занимать место. */
+function showVolume(open = true) {
+  el('volume').classList.toggle('open', open);
+
+  clearTimeout(volumeTimer);
+  if (open) volumeTimer = setTimeout(() => el('volume').classList.remove('open'), 3000);
+}
+
 document.addEventListener('click', (event) => {
   if (event.target.closest('#close')) {
     return ipcRenderer.send('kotamusic:miniplayer:close');
+  }
+
+  if (event.target.closest('[data-action="volume-toggle"]')) {
+    return showVolume(!el('volume').classList.contains('open'));
   }
 
   const action = event.target.closest('[data-action]')?.dataset.action;
@@ -67,6 +81,8 @@ ipcRenderer.on('kotamusic:miniplayer:options', (_event, next) => {
   options = next;
 
   el('volume').hidden = !options.volume;
+  el('volume-button').hidden = !options.volume;
+  if (!options.volume) el('volume').classList.remove('open');
   el('close').hidden = !options.close;
   if (options.seek) el('seek').dataset.seekable = '1';
   else delete el('seek').dataset.seekable;
@@ -82,11 +98,29 @@ el('seek').addEventListener('click', (event) => {
 });
 
 el('volume').addEventListener('input', (event) => {
+  showVolume();
   ipcRenderer.send('kotamusic:miniplayer:action', {
     type: 'volume',
     value: Number(event.target.value),
   });
 });
+
+// Колесо над кнопкой громкости тоже меняет её — привычно и быстро.
+document.addEventListener(
+  'wheel',
+  (event) => {
+    if (!options.volume) return;
+    if (!event.target.closest('#volume-button, #volume')) return;
+
+    const step = event.deltaY < 0 ? 0.05 : -0.05;
+    const value = Math.min(1, Math.max(0, Number(el('volume').value || 0) + step));
+
+    el('volume').value = String(value);
+    showVolume();
+    ipcRenderer.send('kotamusic:miniplayer:action', { type: 'volume', value });
+  },
+  { passive: true }
+);
 ipcRenderer.on('kotamusic:miniplayer:tick', (_event, tick) => {
   // Без трека показывать время не от чего.
   if (!hasTrack) return;
@@ -96,6 +130,7 @@ ipcRenderer.on('kotamusic:miniplayer:tick', (_event, tick) => {
   // Пока ползунок тянут мышью, не перебиваем его значение.
   if (Number.isFinite(tick.volume) && document.activeElement !== el('volume')) {
     el('volume').value = String(tick.volume);
+    el('volume-button').textContent = tick.volume < 0.01 ? '🔇' : tick.volume < 0.5 ? '🔉' : '🔊';
   }
 
   if (typeof tick.isPlaying === 'boolean') el('play').textContent = tick.isPlaying ? '⏸' : '▶';
