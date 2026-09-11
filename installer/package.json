@@ -11,10 +11,26 @@
   "build": {
     "appId": "su.lvl.kotamusic.installer",
     "productName": "KotaMusic",
-    "files": ["src/**/*", "!**/*.map"],
-    "win": { "target": "nsis", "artifactName": "KotaMusic-Setup-${version}.${ext}" },
-    "mac": { "target": "dmg", "artifactName": "KotaMusic-${version}.${ext}" },
-    "linux": { "target": "AppImage", "artifactName": "KotaMusic-${version}.${ext}" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
-  }
+    "files": [
+      "src/**/*",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "KotaMusic-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": "dmg",
+      "artifactName": "KotaMusic-${version}.${ext}"
+    },
+    "linux": {
+      "target": "AppImage",
+      "artifactName": "KotaMusic-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {}
 }

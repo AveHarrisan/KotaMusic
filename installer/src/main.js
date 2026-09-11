@@ -34,19 +34,20 @@ function create() {
   });
 }
 
-ipcMain.handle('installer:state', async () => {
+/** Что показывать в окне: найденный клиент и подходящая сборка мода. */
+async function readState() {
   const found = client.find();
 
   try {
     currentRelease = await releases.findRelease(found?.version);
-  } catch (e) {
+  } catch {
     currentRelease = null;
   }
 
   return { client: found, release: currentRelease };
-});
+}
 
-ipcMain.handle('installer:install', async () => {
+async function doInstall() {
   const found = client.find();
   if (!found) return { ok: false, error: 'Яндекс Музыка не найдена' };
   if (!currentRelease) return { ok: false, error: 'Сборка мода недоступна' };
@@ -61,9 +62,9 @@ ipcMain.handle('installer:install', async () => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
-});
+}
 
-ipcMain.handle('installer:uninstall', async () => {
+async function doUninstall() {
   const found = client.find();
   if (!found) return { ok: false, error: 'Яндекс Музыка не найдена' };
 
@@ -73,8 +74,35 @@ ipcMain.handle('installer:uninstall', async () => {
   } catch (e) {
     return { ok: false, error: e.message };
   }
-});
+}
 
-app.whenReady().then(create);
+ipcMain.handle('installer:state', readState);
+ipcMain.handle('installer:install', doInstall);
+ipcMain.handle('installer:uninstall', doUninstall);
+
+/** Самопроверка: прогоняет то же, что делают кнопки окна. */
+async function selfTest() {
+  const state = await readState();
+  console.log('состояние:', JSON.stringify({
+    клиент: state.client?.dir,
+    версия: state.client?.version,
+    сборка: state.release?.clientVersion,
+    совпадает: state.release?.exact,
+    установлен: state.client?.installed,
+  }, null, 0));
+
+  console.log('установка:', JSON.stringify(await doInstall()));
+  console.log('после установки:', (await readState()).client?.installed);
+
+  console.log('удаление:', JSON.stringify(await doUninstall()));
+  console.log('после удаления:', (await readState()).client?.installed);
+
+  app.quit();
+}
+
+app.whenReady().then(() => {
+  if (process.env.KOTAMUSIC_SELFTEST) return selfTest();
+  create();
+});
 
 app.on('window-all-closed', () => app.quit());

@@ -11,8 +11,37 @@ const API = `https://api.github.com/repos/${REPO}/releases`;
 
 const cacheDir = () => path.join(app.getPath('userData'), 'cache');
 
+/**
+ * Локальная сборка вместо релиза — для проверки установщика до того,
+ * как репозиторий опубликован.
+ */
+function localRelease(clientVersion) {
+  const file = process.env.KOTAMUSIC_LOCAL_ASAR;
+  if (!file || !fs.existsSync(file)) return null;
+
+  let version = clientVersion;
+  try {
+    const info = path.join(path.dirname(file), 'build-info.json');
+    version = JSON.parse(fs.readFileSync(info, 'utf8')).clientVersion;
+  } catch {}
+
+  return {
+    tag: `local-${version}`,
+    name: 'Локальная сборка',
+    notes: '',
+    url: file,
+    size: fs.statSync(file).size,
+    clientVersion: version,
+    exact: version === clientVersion,
+    local: true,
+  };
+}
+
 /** Релиз мода под указанную версию клиента, иначе — самый свежий. */
 async function findRelease(clientVersion) {
+  const local = localRelease(clientVersion);
+  if (local) return local;
+
   const response = await fetch(API, {
     headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'KotaMusic' },
   });
@@ -41,6 +70,11 @@ async function findRelease(clientVersion) {
 
 /** Качает файл мода, сообщая о ходе загрузки. */
 async function download(release, onProgress) {
+  if (release.local) {
+    onProgress?.(1);
+    return release.url;
+  }
+
   await fsp.mkdir(cacheDir(), { recursive: true });
   const target = path.join(cacheDir(), `app-${release.tag}.asar`);
 

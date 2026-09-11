@@ -19,7 +19,7 @@ function render(state) {
   el('state').textContent = state.client?.installed ? 'установлен' : 'не установлен';
 
   el('install').disabled = !state.client || !state.release;
-  el('uninstall').disabled = !state.client?.installed;
+  el('uninstall').disabled = !state.client?.installed || !state.client?.hasBackup;
 
   if (state.client && state.release && !state.release.exact) {
     setStatus(

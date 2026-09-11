@@ -2,3 +2,5 @@ node_modules/
 .work/
 dist/
 .env
+installer/node_modules/
+installer/dist/
