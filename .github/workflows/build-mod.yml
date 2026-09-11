@@ -37,18 +37,35 @@ jobs:
         run: node scripts/build.js --platform=linux
 
       - id: info
-        name: Прочитать версию клиента
-        run: echo "client=$(node -p "require('./dist/build-info.json').clientVersion")" >> $GITHUB_OUTPUT
+        name: Прочитать версии
+        run: |
+          echo "client=$(node -p "require('./dist/build-info.json').clientVersion")" >> $GITHUB_OUTPUT
+          echo "mod=$(node -p "require('./dist/build-info.json').modVersion")" >> $GITHUB_OUTPUT
 
-      - name: Проверить, что релиз ещё не выложен
+      # Релиз на версию клиента один, но сам мод внутри него обновляется:
+      # сверяем версию мода в выложенном build-info.json с собранной.
+      - name: Решить, нужен ли релиз
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: mod-${{ steps.info.outputs.client }}
+          MOD: ${{ steps.info.outputs.mod }}
         run: |
-          if gh release view "mod-${{ steps.info.outputs.client }}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "publish=true" >> $GITHUB_OUTPUT
+            echo "Релиза ещё нет — выкладываем."
+            exit 0
+          fi
+
+          published=$(gh release download "$TAG" --pattern build-info.json --output - 2>/dev/null \
+            | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).modVersion || ''" 2>/dev/null || true)
+
+          if [ "$published" = "$MOD" ]; then
+            echo "publish=false" >> $GITHUB_OUTPUT
+            echo "В релизе уже мод $published — выкладывать нечего."
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "publish=true" >> $GITHUB_OUTPUT
+            echo "В релизе мод '$published', собран $MOD — обновляем."
           fi
 
       - uses: actions/upload-artifact@v4
@@ -57,16 +74,18 @@ jobs:
           path: dist/
 
       - name: Выложить релиз
-        if: steps.check.outputs.exists == 'false' && github.event_name != 'push'
+        if: steps.check.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: mod-${{ steps.info.outputs.client }}
           name: KotaMusic для Яндекс Музыки ${{ steps.info.outputs.client }}
           body: |
-            Собрано автоматически для клиента **${{ steps.info.outputs.client }}**.
+            Собрано автоматически для клиента **${{ steps.info.outputs.client }}**,
+            версия мода **${{ steps.info.outputs.mod }}**.
 
-            Ставить через установщик KotaMusic: одной подмены файла мало —
-            Windows и macOS проверяют целостность `app.asar`.
+            Первая установка — через установщик KotaMusic: одной подмены файла
+            мало, Windows и macOS проверяют целостность `app.asar`. Дальше мод
+            обновляет себя сам.
           files: |
             dist/app.asar
             dist/build-info.json

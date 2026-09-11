@@ -121,8 +121,6 @@ async function main() {
   await fsp.mkdir(OUT, { recursive: true });
   const outAsar = path.join(OUT, `app.asar`);
   await asar.createPackageWithOptions(extracted, outAsar, {
-    // Иконки для панели задач Windows нужны настоящими файлами на диске:
-    // из архива системные вызовы их не читают.
     // Распакованными оставляем только файлы самого клиента: свои картинки
     // мод раскладывает сам при запуске, и тогда app.asar — единственное,
     // что нужно подменить при обновлении.
@@ -134,7 +132,11 @@ async function main() {
 
   await fsp.writeFile(
     path.join(OUT, 'build-info.json'),
-    JSON.stringify({ clientVersion: version, platform, patches: report }, null, 2)
+    JSON.stringify(
+      { clientVersion: version, modVersion, platform, patches: report },
+      null,
+      2
+    )
   );
 
   if (!('keep' in args)) await fsp.rm(extracted, { recursive: true, force: true });
