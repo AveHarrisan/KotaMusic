@@ -3,13 +3,13 @@
 // в исполняемый файл (Windows) и в Info.plist (macOS). После подмены asar
 // его нужно обновить, иначе клиент откажется запускаться.
 
-const fs = require('fs');
+const fs = require('./fs');
 const crypto = require('crypto');
-const asar = require('@electron/asar');
+const asar = require('./asar');
 
 /** Хеш заголовка asar — именно его сверяет Electron. */
 function headerHash(asarPath) {
-  const { headerString } = asar.getRawHeader(asarPath);
+  const { headerString } = asar.readHeader(asarPath);
   return crypto.createHash('sha256').update(headerString).digest('hex');
 }
 
@@ -28,7 +28,9 @@ function patchExecutable(exePath, asarPath) {
   const text = buf.toString('latin1');
   const re = /\{"file":"resources[\\\\/]+app\.asar","alg":"SHA256","value":"([0-9a-f]{64})"\}/;
   const found = re.exec(text);
-  if (!found) throw new Error('В исполняемом файле нет блока целостности asar');
+
+  // На Linux проверки целостности нет вовсе — там правка не нужна.
+  if (!found) return { patched: false, absent: true, to: expected };
 
   const current = found[1];
   if (current === expected) return { patched: false, to: expected };

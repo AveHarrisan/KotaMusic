@@ -1,13 +1,16 @@
 'use strict';
 // Поиск установленной Яндекс Музыки и работа с её файлами.
 
-const fs = require('fs');
+const fs = require('./fs');
 const path = require('path');
 const os = require('os');
 
 /** Стандартные места установки клиента на каждой системе. */
 function candidatePaths() {
   const home = os.homedir();
+
+  // Путь можно задать вручную: установка бывает и не в стандартном месте.
+  if (process.env.KOTAMUSIC_CLIENT_DIR) return [process.env.KOTAMUSIC_CLIENT_DIR];
 
   if (process.platform === 'win32') {
     const local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
@@ -48,10 +51,18 @@ function describe(dir) {
   const asar = path.join(dir, 'resources', 'app.asar');
   if (!fs.existsSync(asar)) return null;
 
+  const { extractFile, readHeader } = require('./asar');
+
   let version = null;
+  let installed = false;
+
   try {
-    const asarLib = require('@electron/asar');
-    version = JSON.parse(asarLib.extractFile(asar, 'package.json').toString()).version;
+    version = JSON.parse(extractFile(asar, 'package.json').toString()).version;
+
+    // Установлен — значит внутри архива лежит наша папка. Наличие
+    // резервной копии о текущем состоянии ничего не говорит: её мы
+    // держим и после удаления мода.
+    installed = Boolean(readHeader(asar).header.files?.kotamusic);
   } catch {}
 
   const backup = asar + '.original';
@@ -62,7 +73,8 @@ function describe(dir) {
     backup,
     executable: executableIn(dir),
     version,
-    installed: fs.existsSync(backup),
+    installed,
+    hasBackup: fs.existsSync(backup),
   };
 }
 

@@ -5,8 +5,8 @@
 // потом трогаем их. Иначе можно подменить app.asar и не суметь поправить
 // хеш в исполняемом файле — тогда клиент перестанет запускаться.
 
-const fs = require('fs');
-const fsp = require('fs/promises');
+const fs = require('./fs');
+const fsp = fs.promises;
 
 const { isRunning } = require('./client');
 const { patchExecutable, headerHash } = require('./integrity');
@@ -34,7 +34,10 @@ async function install(info, modPath) {
   // Windows и macOS проверяют целостность архива — обновляем хеш.
   if (info.executable) {
     try {
-      patchExecutable(info.executable, info.asar);
+      const result = patchExecutable(info.executable, info.asar);
+      if (result.absent) {
+        // Проверки целостности нет — так бывает на Linux, это нормально.
+      }
     } catch (e) {
       // Не смогли — возвращаем оригинал, чтобы не оставить клиент сломанным.
       await fsp.copyFile(info.backup, info.asar);
@@ -48,6 +51,7 @@ async function install(info, modPath) {
 async function uninstall(info) {
   if (isRunning(info)) throw new Error('Яндекс Музыка запущена — закройте её и повторите');
   if (!fs.existsSync(info.backup)) throw new Error('Резервной копии нет, откатывать нечего');
+
 
   await fsp.copyFile(info.backup, info.asar);
 

@@ -28,7 +28,9 @@ function patchExecutable(exePath, asarPath) {
   const text = buf.toString('latin1');
   const re = /\{"file":"resources[\\\\/]+app\.asar","alg":"SHA256","value":"([0-9a-f]{64})"\}/;
   const found = re.exec(text);
-  if (!found) throw new Error('В исполняемом файле нет блока целостности asar');
+
+  // На Linux проверки целостности нет вовсе — там правка не нужна.
+  if (!found) return { patched: false, absent: true, to: expected };
 
   const current = found[1];
   if (current === expected) return { patched: false, to: expected };
