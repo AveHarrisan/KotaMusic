@@ -17,7 +17,8 @@ function create() {
   window = new BrowserWindow({
     width: 520,
     height: 560,
-    minHeight: 480,
+    minHeight: 420,
+    useContentSize: true,
     resizable: true,
     title: 'KotaMusic',
     backgroundColor: '#161616',
@@ -206,6 +207,18 @@ async function doLaunch() {
     return { ok: false, error: e.message };
   }
 }
+
+// Содержимое разное, а у людей ещё и масштаб системы: подгоняем высоту
+// окна под то, что в нём на самом деле, но не выше рабочего стола.
+ipcMain.on('installer:fit', (_event, height) => {
+  if (!window || window.isDestroyed()) return;
+
+  const { screen } = require('electron');
+  const free = screen.getDisplayMatching(window.getBounds()).workAreaSize.height - 80;
+  const [width] = window.getContentSize();
+
+  window.setContentSize(width, Math.max(420, Math.min(Math.ceil(height), free)));
+});
 
 ipcMain.handle('installer:state', readState);
 ipcMain.handle('installer:launch', doLaunch);

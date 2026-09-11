@@ -5,9 +5,18 @@ const { ipcRenderer } = require('electron');
 
 const el = (id) => document.getElementById(id);
 
+/** Просим главный процесс подогнать окно под содержимое. */
+function fitWindow() {
+  requestAnimationFrame(() => {
+    const height = document.documentElement.scrollHeight;
+    ipcRenderer.send('installer:fit', height);
+  });
+}
+
 function setStatus(text, kind = '') {
   el('status').textContent = text;
   el('status').className = kind;
+  fitWindow();
 }
 
 function render(state) {
@@ -37,6 +46,8 @@ function render(state) {
 
   // Запустить клиент можно, как только он найден.
   el('launch').hidden = !state.client?.executable;
+
+  fitWindow();
 
   // Сборку мода не видно — даём повторить попытку, не перезапуская окно.
   el('retry').hidden = Boolean(state.release);
