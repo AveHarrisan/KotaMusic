@@ -78,11 +78,15 @@ class DiscordIPC extends EventEmitter {
         this.socket = socket;
 
         socket.on('data', (chunk) => this.#onData(chunk));
-        socket.on('close', () => {
-          this.connected = false;
-          this.emit('close');
+        socket.on('close', () => this.#drop());
+
+        // Разрыв со стороны Discord приходит то ошибкой, то закрытием —
+        // и то и другое означает, что писать больше некуда.
+        socket.on('error', (e) => {
+          this.emit('error', e);
+          this.#drop();
         });
-        socket.on('error', (e) => this.emit('error', e));
+        socket.on('end', () => this.#drop());
 
         this.once('ready', () => resolve());
         this.once('handshake-error', reject);
@@ -91,10 +95,33 @@ class DiscordIPC extends EventEmitter {
     });
   }
 
+  /** Сообщает о потере соединения один раз. */
+  #drop() {
+    if (!this.socket && !this.connected) return;
+
+    this.connected = false;
+    this.socket = null;
+    this.emit('close');
+  }
+
   /** Единственное место записи — чтобы всё уходящее было видно в журнале. */
   write(op, payload) {
+    if (!this.socket || this.socket.destroyed) {
+      this.#drop();
+      return false;
+    }
+
     this.onFrame?.(op, payload);
-    this.socket.write(encode(op, payload));
+
+    try {
+      this.socket.write(encode(op, payload));
+    } catch (e) {
+      this.emit('error', e);
+      this.#drop();
+      return false;
+    }
+
+    return true;
   }
 
   #onData(chunk) {
@@ -128,29 +155,31 @@ class DiscordIPC extends EventEmitter {
 
   setActivity(activity) {
     if (!this.connected) return false;
-    this.write(OP.FRAME, {
+
+    return this.write(OP.FRAME, {
       cmd: 'SET_ACTIVITY',
       args: { pid: process.pid, activity },
       // Discord ждёт идентификатор запроса именно в формате UUID.
       nonce: randomUUID(),
     });
-    return true;
   }
 
   clearActivity() {
     if (!this.connected) return false;
-    this.write(OP.FRAME, {
+
+    return this.write(OP.FRAME, {
       cmd: 'SET_ACTIVITY',
       args: { pid: process.pid },
       nonce: randomUUID(),
     });
-    return true;
   }
 
   destroy() {
     this.connected = false;
-    if (this.socket) this.socket.destroy();
+
+    const socket = this.socket;
     this.socket = null;
+    socket?.destroy();
   }
 }
 

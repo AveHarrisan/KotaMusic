@@ -16,7 +16,6 @@ const FILE = 'kotamusic.json';
 const WORKING_PRESET = {
   progress: 'counter',
   showTrackInMemberList: false,
-  useLibrary: true,
 };
 
 const DEFAULTS = {
@@ -78,10 +77,6 @@ const DEFAULTS = {
   // Собирать статус в точности как старый мод — для сравнения.
   authorStyle: false,
 
-  // Чем отправлять статус: своим клиентом или библиотекой старого мода.
-  // Переключатель нужен, пока выясняем, почему статус не рассылается.
-  useLibrary: false,
-
   // Подробный журнал: что уходит в Discord и что он отвечает.
   debug: true,
 };
@@ -123,6 +118,7 @@ function load() {
   }
 
   delete values.miniplayerHotkey;
+  delete values.useLibrary;
 
   // Неизвестные действия могли появиться в новой версии мода.
   values.hotkeys = { ...DEFAULTS.hotkeys, ...values.hotkeys };

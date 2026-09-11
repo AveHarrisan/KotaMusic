@@ -4,7 +4,6 @@
 const { app, ipcMain } = require('electron');
 
 const { DiscordIPC } = require('./discord-ipc');
-const { libraryClient } = require('./discord-library');
 const branding = require('../branding');
 const album = require('./album');
 const settings = require('./settings');
@@ -236,7 +235,14 @@ function sync() {
 
   const payload = simplify ? basic(activity) : activity;
   log.debug('Отправлено в Discord:', JSON.stringify(payload));
-  if (!rpc.setActivity(payload)) log.warn('Статус не отправлен: нет связи с Discord');
+
+  // Discord мог закрыться или перезапуститься — тогда отправка не удастся
+  // и надо подключаться заново, а не писать в пустоту дальше.
+  if (!rpc.setActivity(payload)) {
+    log.warn('Статус не отправлен, переподключаюсь');
+    lastSent = '';
+    scheduleReconnect();
+  }
 }
 
 /**
@@ -257,7 +263,7 @@ function scheduleSync() {
 }
 
 function scheduleReconnect() {
-  if (reconnectTimer) return;
+  if (reconnectTimer || rpc?.connected) return;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     connect();
@@ -268,14 +274,15 @@ async function connect() {
   const clientId = settings.get().discordApplicationId;
   if (!clientId) return log.warn('Rich Presence выключен: не задан идентификатор приложения');
 
-  const useLibrary = settings.get().useLibrary;
-  log.info(`Отправка ${useLibrary ? 'библиотекой' : 'своим клиентом'}`);
+  // Прошлое соединение закрываем до создания нового: иначе Discord
+  // увидит два статуса сразу — по одному на каждый живой сокет.
+  const previous = rpc;
+  rpc = null;
+  previous?.destroy();
 
-  const client = useLibrary
-    ? libraryClient(clientId, log)
-    : new DiscordIPC(clientId, (op, payload) =>
-        log.debug(`Кадр клиента op=${op}:`, JSON.stringify(payload).slice(0, 500))
-      );
+  const client = new DiscordIPC(clientId, (op, payload) =>
+    log.debug(`Кадр op=${op}:`, JSON.stringify(payload).slice(0, 500))
+  );
   rpc = client;
   client.on('close', () => {
     // Закрытие уже заменённого соединения нас не касается: иначе на каждую
@@ -438,10 +445,7 @@ function start() {
 
   // Переключатели в настройках должны действовать сразу.
   settings.onChange((now, before) => {
-    if (
-      now.discordApplicationId !== before.discordApplicationId ||
-      now.useLibrary !== before.useLibrary
-    ) {
+    if (now.discordApplicationId !== before.discordApplicationId) {
       log.info('Меняю способ отправки, переподключаюсь');
 
       const previous = rpc;
