@@ -4,6 +4,74 @@
 const fs = require('./fs');
 const path = require('path');
 const os = require('os');
+const { spawnSync } = require('child_process');
+
+/**
+ * Где Windows записала установку клиента. Папку выбирает человек, и она
+ * бывает какой угодно — стандартный путь тут не помощник, зато запись
+ * об установке ведёт прямо к ней.
+ */
+function fromRegistry() {
+  if (process.platform !== 'win32') return [];
+
+  const script = `
+    [Console]::OutputEncoding = [Text.Encoding]::UTF8
+    $roots = @(
+      'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+      'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+    )
+    Get-ItemProperty $roots -ErrorAction SilentlyContinue |
+      Where-Object { $_.DisplayName -like '*Музык*' -or $_.DisplayName -like '*Yandex*Music*' } |
+      ForEach-Object { if ($_.InstallLocation) { $_.InstallLocation } elseif ($_.DisplayIcon) { $_.DisplayIcon } }
+  `;
+
+  try {
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 8000,
+    });
+
+    return (result.stdout || '')
+      .split(/\r?\n/)
+      .map((line) => line.trim().replace(/,\d+$/, '')) // «путь\файл.exe,0»
+      .filter(Boolean)
+      .map((entry) => (/\.exe$/i.test(entry) ? path.dirname(entry) : entry));
+  } catch {
+    return [];
+  }
+}
+
+/** Папка, выбранная человеком вручную, — она главнее любых догадок. */
+function settingsFile() {
+  try {
+    const { app } = require('electron');
+    return path.join(app.getPath('userData'), 'installer.json');
+  } catch {
+    return null;
+  }
+}
+
+function remembered() {
+  const file = settingsFile();
+  if (!file || !fs.existsSync(file)) return null;
+
+  try {
+    const dir = JSON.parse(fs.readFileSync(file, 'utf8')).clientDir;
+    return dir && fs.existsSync(dir) ? dir : null;
+  } catch {
+    return null;
+  }
+}
+
+function remember(dir) {
+  const file = settingsFile();
+  if (!file) return;
+
+  try {
+    fs.writeFileSync(file, JSON.stringify({ clientDir: dir }, null, 2));
+  } catch {}
+}
 
 /** Стандартные места установки клиента на каждой системе. */
 function candidatePaths() {
@@ -12,9 +80,18 @@ function candidatePaths() {
   // Путь можно задать вручную: установка бывает и не в стандартном месте.
   if (process.env.KOTAMUSIC_CLIENT_DIR) return [process.env.KOTAMUSIC_CLIENT_DIR];
 
+  const chosen = remembered();
+  if (chosen) return [chosen];
+
   if (process.platform === 'win32') {
     const local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
-    return [path.join(local, 'Programs', 'YandexMusic')];
+
+    return [
+      ...fromRegistry(),
+      path.join(local, 'Programs', 'YandexMusic'),
+      path.join(local, 'Programs', 'Яндекс Музыка'),
+      path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'YandexMusic'),
+    ];
   }
 
   if (process.platform === 'darwin') {
@@ -113,4 +190,4 @@ function isRunning(info) {
   return false;
 }
 
-module.exports = { find, describe, isRunning, candidatePaths };
+module.exports = { find, describe, isRunning, candidatePaths, remember, remembered };

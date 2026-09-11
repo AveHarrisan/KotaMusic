@@ -2,7 +2,8 @@
 // Установщик KotaMusic.
 
 const path = require('path');
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { spawn } = require('child_process');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 
 const client = require('./client');
 const releases = require('./releases');
@@ -81,6 +82,12 @@ async function doUninstall() {
  * Клиента нет — качаем официальный установщик Яндекс Музыки и запускаем
  * его. Сам мод ставится уже потом, поверх установленного клиента.
  */
+/** Куда ставим клиент, если его ещё нет. */
+function defaultClientDir() {
+  const local = process.env.LOCALAPPDATA || path.join(require('os').homedir(), 'AppData', 'Local');
+  return path.join(local, 'Programs', 'YandexMusic');
+}
+
 async function doInstallClient() {
   try {
     const { version, url } = await upstream.latest();
@@ -89,8 +96,24 @@ async function doInstallClient() {
       window?.webContents.send('installer:progress', ratio)
     );
 
-    // Дальше человек проходит установку клиента сам: это чужой установщик,
-    // молча за него отвечать мы не вправе.
+    // На Windows ставим сами и в понятное место: установщик Яндекса
+    // предлагает папку из записи о прошлой установке, а она бывает
+    // где угодно — потом ни найти, ни объяснить.
+    if (process.platform === 'win32') {
+      const dir = defaultClientDir();
+
+      await new Promise((done, fail) => {
+        const child = spawn(file, ['/S', `/D=${dir}`], { stdio: 'ignore' });
+        child.on('exit', () => done());
+        child.on('error', fail);
+      });
+
+      client.remember(dir);
+      return { ok: true, version, dir };
+    }
+
+    // На других системах установку проходит человек: там у пакета
+    // свои правила, и лезть за него мы не вправе.
     const error = await shell.openPath(file);
     if (error) throw new Error(error);
 
@@ -100,7 +123,27 @@ async function doInstallClient() {
   }
 }
 
+/** Ручной выбор папки клиента: установка бывает где угодно. */
+async function pickFolder() {
+  const result = await dialog.showOpenDialog(window, {
+    title: 'Где стоит Яндекс Музыка',
+    properties: ['openDirectory'],
+    buttonLabel: 'Выбрать',
+  });
+
+  if (result.canceled || !result.filePaths.length) return { ok: false };
+
+  const dir = result.filePaths[0];
+  client.remember(dir);
+
+  const found = client.find();
+  if (!found) return { ok: false, error: 'В этой папке нет Яндекс Музыки' };
+
+  return { ok: true, dir: found.dir };
+}
+
 ipcMain.handle('installer:state', readState);
+ipcMain.handle('installer:pick-folder', pickFolder);
 ipcMain.handle('installer:install-client', doInstallClient);
 ipcMain.handle('installer:install', doInstall);
 ipcMain.handle('installer:uninstall', doUninstall);

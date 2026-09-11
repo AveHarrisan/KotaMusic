@@ -24,6 +24,7 @@ function render(state) {
   // Клиента нет — предлагаем поставить его с сайта Яндекса, и тогда
   // главная кнопка окна именно эта.
   el('install-client').hidden = Boolean(state.client);
+  el('pick').hidden = Boolean(state.client);
   el('install').classList.toggle('secondary', !state.client);
 
   if (!state.client) {
@@ -56,14 +57,16 @@ el('install').addEventListener('click', async () => {
 
 el('install-client').addEventListener('click', async () => {
   el('install-client').disabled = true;
-  setStatus('Качаем установщик Яндекс Музыки…');
+  setStatus('Качаем и ставим Яндекс Музыку…');
   el('progress').hidden = false;
 
   const result = await ipcRenderer.invoke('installer:install-client');
   el('progress').hidden = true;
   el('install-client').disabled = false;
 
-  if (result.ok) {
+  if (result.ok && result.dir) {
+    setStatus(`Яндекс Музыка ${result.version} установлена в ${result.dir}.`, 'done');
+  } else if (result.ok) {
     setStatus(
       `Запустили установщик Яндекс Музыки ${result.version}. ` +
         'Пройдите установку и нажмите «Установить».',
@@ -72,6 +75,15 @@ el('install-client').addEventListener('click', async () => {
   } else {
     setStatus(result.error, 'error');
   }
+
+  render(await ipcRenderer.invoke('installer:state'));
+});
+
+el('pick').addEventListener('click', async () => {
+  const result = await ipcRenderer.invoke('installer:pick-folder');
+
+  if (result.ok) setStatus(`Клиент найден: ${result.dir}`, 'done');
+  else if (result.error) setStatus(result.error, 'error');
 
   render(await ipcRenderer.invoke('installer:state'));
 });
@@ -92,9 +104,26 @@ ipcRenderer.on('installer:progress', (_event, ratio) => {
   el('progress').max = 1;
 });
 
+/**
+ * Пока клиента нет, поглядываем сами: человек ставит его прямо сейчас,
+ * и окно должно это заметить без перезапуска.
+ */
+function watchForClient() {
+  const timer = setInterval(async () => {
+    const state = await ipcRenderer.invoke('installer:state');
+    if (!state.client) return;
+
+    clearInterval(timer);
+    render(state);
+    setStatus('Яндекс Музыка найдена. Можно ставить мод.', 'done');
+  }, 3000);
+}
+
 (async () => {
   const state = await ipcRenderer.invoke('installer:state');
   render(state);
+
+  if (!state.client) watchForClient();
 
   if (!state.release && state.client) setStatus('Не удалось получить список сборок мода.', 'error');
 })();
