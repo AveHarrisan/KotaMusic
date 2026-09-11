@@ -115,6 +115,21 @@
     transition: width 1s linear;
   }
 
+  /* Процент громкости появляется над полосой прогресса на пару секунд. */
+  #volume-label {
+    position: fixed;
+    right: 12px;
+    bottom: 13px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity .15s;
+    pointer-events: none;
+  }
+
+  #volume-label.show { opacity: 1; }
+
   #close {
     position: fixed;
     top: 6px;
@@ -154,6 +169,8 @@
     <span id="time"></span>
   </div>
 </div>
+
+<div id="volume-label"></div>
 
 <div id="seek"><div id="progress"><i></i></div></div>
 
