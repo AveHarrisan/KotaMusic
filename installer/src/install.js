@@ -24,6 +24,13 @@ async function install(info, modPath) {
 
   await fsp.copyFile(modPath, info.asar);
 
+  // Часть файлов мода должна лежать распакованной рядом с архивом:
+  // системные вызовы Windows не читают их изнутри.
+  const unpacked = modPath + '.unpacked';
+  if (fs.existsSync(unpacked)) {
+    await fsp.cp(unpacked, info.asar + '.unpacked', { recursive: true, force: true });
+  }
+
   // Windows и macOS проверяют целостность архива — обновляем хеш.
   if (info.executable) {
     try {

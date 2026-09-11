@@ -33,6 +33,9 @@ const DEFAULTS = {
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
 
+  // Кнопки управления в миниатюре окна на панели задач Windows.
+  taskbarButtons: true,
+
   // Глобальные горячие клавиши поверх других окон.
   hotkeys: true,
 
