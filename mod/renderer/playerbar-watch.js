@@ -18,7 +18,7 @@ const ID = {
   bar: ['PLAYERBAR_DESKTOP', 'VIBE_PLAYERBAR'],
   title: ['TRACK_TITLE', 'VIBE_PLAYERBAR_TRACK_NAME'],
   artist: ['SEPARATED_ARTIST_TITLE'],
-  cover: ['ENTITY_COVER_IMAGE'],
+  cover: ['ENTITY_COVER_IMAGE', 'VIBE_ALBUM_COVER', 'PLAYERBAR_DESKTOP_COVER_CONTAINER'],
   pause: ['PAUSE_BUTTON'],
   slider: ['TIMECODE_SLIDER'],
   timecode: ['VIBE_PLAYERBAR_TIMECODE'],
@@ -73,6 +73,18 @@ function parseTimecode(value) {
   return { position, duration };
 }
 
+/** Адрес обложки: элемент бывает и картинкой, и контейнером с картинкой. */
+function imageFrom(node) {
+  if (!node) return null;
+
+  const img = node.tagName === 'IMG' ? node : node.querySelector('img');
+  const src = img?.currentSrc || img?.src;
+  if (!src) return null;
+
+  // Размер в адресе бывает «100x100» или «orig» — просим удобную середину.
+  return src.replace(/\/(?:\d+x\d+|orig)$/, '/400x400');
+}
+
 function readState() {
   const bar = pick(document, ID.bar);
   if (!bar) return null;
@@ -91,7 +103,10 @@ function readState() {
     ? pickAll(bar, ID.artist)
     : pickAll(document, ID.artist);
 
-  const cover = pick(bar, ID.cover) || pick(document, ID.cover);
+  // Обложку ищем только внутри панели: по всей странице попадётся
+  // картинка первой попавшейся карточки, и она не будет меняться.
+  const coverNode = pick(bar, ID.cover);
+  const coverUrl = imageFrom(coverNode);
   const slider = pick(bar, ID.slider) || pick(document, ID.slider);
   const pause = pick(bar, ID.pause) || pick(document, ID.pause);
 
@@ -112,8 +127,7 @@ function readState() {
     artists: artistLinks.map(cleanText).filter(Boolean),
     trackUrl: absolute(titleEl?.getAttribute('href') || albumLink?.getAttribute('href')),
     artistUrl: absolute(artistLinks[0]?.getAttribute('href')),
-    // В панели обложка 100x100 — просим версию покрупнее.
-    cover: cover?.src ? cover.src.replace(/\/\d+x\d+$/, '/400x400') : null,
+    cover: coverUrl,
     // Кнопка «Пауза» показывается только во время воспроизведения.
     isPlaying: Boolean(pause),
     position: Number.isFinite(position) ? position : null,

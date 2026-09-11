@@ -151,24 +151,6 @@ function fill(container) {
 
   container.appendChild(
     row(
-      'Приложение Discord',
-      'Его название видно в статусе как «слушает …». Создаётся на discord.com/developers',
-      textField(config.discordApplicationId, (value) =>
-        update({ discordApplicationId: value || undefined })
-      )
-    )
-  );
-
-  container.appendChild(
-    row(
-      'Отправка библиотекой',
-      'Временно: сравниваем два способа отправки статуса',
-      toggle(config.useLibrary, (value) => update({ useLibrary: value }))
-    )
-  );
-
-  container.appendChild(
-    row(
       'Подробный журнал',
       'Записывать в файл, что уходит в Discord',
       toggle(config.debug, (value) => update({ debug: value }))
