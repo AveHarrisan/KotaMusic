@@ -1,6 +1,7 @@
-node_modules/
+.env
 .work/
 dist/
-.env
-installer/node_modules/
+installer/build/icon.png.bak
 installer/dist/
+installer/node_modules/
+node_modules/

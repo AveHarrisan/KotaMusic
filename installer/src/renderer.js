@@ -21,6 +21,15 @@ function render(state) {
   el('install').disabled = !state.client || !state.release;
   el('uninstall').disabled = !state.client?.installed || !state.client?.hasBackup;
 
+  // Клиента нет — предлагаем поставить его с сайта Яндекса, и тогда
+  // главная кнопка окна именно эта.
+  el('install-client').hidden = Boolean(state.client);
+  el('install').classList.toggle('secondary', !state.client);
+
+  if (!state.client) {
+    setStatus('Яндекс Музыка не найдена. Установите её — адрес свежей версии берём у Яндекса.');
+  }
+
   if (state.client && state.release && !state.release.exact) {
     setStatus(
       `Мод собран под клиент ${state.release.clientVersion}, а у вас ${state.client.version}. ` +
@@ -45,6 +54,28 @@ el('install').addEventListener('click', async () => {
   render(await ipcRenderer.invoke('installer:state'));
 });
 
+el('install-client').addEventListener('click', async () => {
+  el('install-client').disabled = true;
+  setStatus('Качаем установщик Яндекс Музыки…');
+  el('progress').hidden = false;
+
+  const result = await ipcRenderer.invoke('installer:install-client');
+  el('progress').hidden = true;
+  el('install-client').disabled = false;
+
+  if (result.ok) {
+    setStatus(
+      `Запустили установщик Яндекс Музыки ${result.version}. ` +
+        'Пройдите установку и нажмите «Установить».',
+      'done'
+    );
+  } else {
+    setStatus(result.error, 'error');
+  }
+
+  render(await ipcRenderer.invoke('installer:state'));
+});
+
 el('uninstall').addEventListener('click', async () => {
   el('uninstall').disabled = true;
   setStatus('Возвращаем оригинал…');
@@ -65,6 +96,5 @@ ipcRenderer.on('installer:progress', (_event, ratio) => {
   const state = await ipcRenderer.invoke('installer:state');
   render(state);
 
-  if (!state.client) setStatus('Яндекс Музыка не найдена. Установите её и откройте меня снова.', 'error');
-  else if (!state.release) setStatus('Не удалось получить список сборок мода.', 'error');
+  if (!state.release && state.client) setStatus('Не удалось получить список сборок мода.', 'error');
 })();

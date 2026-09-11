@@ -17,20 +17,39 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "KotaMusic-Setup-${version}.${ext}"
+      "artifactName": "KotaMusic-Setup-${version}.${ext}",
+      "icon": "build/icon.png"
     },
     "mac": {
       "target": "dmg",
-      "artifactName": "KotaMusic-${version}.${ext}"
+      "artifactName": "KotaMusic-${version}.${ext}",
+      "icon": "build/icon.png",
+      "category": "public.app-category.utilities"
     },
     "linux": {
       "target": "AppImage",
-      "artifactName": "KotaMusic-${version}.${ext}"
+      "artifactName": "KotaMusic-${version}.${ext}",
+      "icon": "build/icon.png",
+      "category": "Utility"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "artifactName": "KotaMusic-Setup-${version}.${ext}",
+      "shortcutName": "KotaMusic",
+      "uninstallDisplayName": "KotaMusic"
+    },
+    "copyright": "KotaMusic",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
     }
   },
-  "dependencies": {}
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3"
+  },
+  "author": "Harrisan",
+  "license": "MIT"
 }

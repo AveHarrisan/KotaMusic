@@ -6,6 +6,7 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 
 const client = require('./client');
 const releases = require('./releases');
+const upstream = require('./upstream');
 const { install, uninstall } = require('./install');
 
 let window = null;
@@ -14,7 +15,7 @@ let currentRelease = null;
 function create() {
   window = new BrowserWindow({
     width: 520,
-    height: 420,
+    height: 470,
     resizable: false,
     title: 'KotaMusic',
     backgroundColor: '#161616',
@@ -76,7 +77,31 @@ async function doUninstall() {
   }
 }
 
+/**
+ * Клиента нет — качаем официальный установщик Яндекс Музыки и запускаем
+ * его. Сам мод ставится уже потом, поверх установленного клиента.
+ */
+async function doInstallClient() {
+  try {
+    const { version, url } = await upstream.latest();
+
+    const file = await upstream.download(url, (ratio) =>
+      window?.webContents.send('installer:progress', ratio)
+    );
+
+    // Дальше человек проходит установку клиента сам: это чужой установщик,
+    // молча за него отвечать мы не вправе.
+    const error = await shell.openPath(file);
+    if (error) throw new Error(error);
+
+    return { ok: true, version };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 ipcMain.handle('installer:state', readState);
+ipcMain.handle('installer:install-client', doInstallClient);
 ipcMain.handle('installer:install', doInstall);
 ipcMain.handle('installer:uninstall', doUninstall);
 
