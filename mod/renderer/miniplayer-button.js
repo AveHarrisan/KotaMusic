@@ -27,6 +27,23 @@ const LOCK_ICON = (closed) =>
 // Отступ от плашки версии.
 const GAP = 8;
 
+/**
+ * Плашка версии не просто есть в разметке, а действительно видна: над ней
+ * нет заставки клиента. Разметку клиент собирает заранее, а рисует окно
+ * на несколько секунд позже, и наши кнопки иначе появляются раньше всего.
+ */
+function badgeOnTop(badge) {
+  const rect = badge.getBoundingClientRect();
+  if (!rect.width || !rect.height) return false;
+
+  const top = document.elementFromPoint(
+    Math.round(rect.left + rect.width / 2),
+    Math.round(rect.top + rect.height / 2)
+  );
+
+  return Boolean(top) && (badge.contains(top) || top.contains(badge));
+}
+
 /** Сколько размеченных элементов клиента реально видно на экране. */
 function visibleCount() {
   let count = 0;
@@ -253,9 +270,11 @@ function start() {
       // Плашка версии и панель плеера появляются раньше, чем клиент
       // дорисовывает окно. Ждём живую панель с кнопкой воспроизведения
       // и боковое меню — к этому моменту интерфейс уже собран.
-      if (!versionBadge()) return;
+      const badge = versionBadge();
+      if (!badge) return;
 
       if (!waitedTooLong) {
+        if (!badgeOnTop(badge)) return;
         if (document.readyState !== 'complete') return;
         if (!bar || !bar.offsetHeight) return;
         if (!bar.querySelector(PLAY_CONTROL)) return;
