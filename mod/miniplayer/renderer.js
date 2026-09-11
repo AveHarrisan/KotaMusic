@@ -53,6 +53,18 @@ function update(position) {
 }
 
 let volumeTimer = null;
+let labelTimer = null;
+let lastVolume = null;
+
+/** Короткая подсказка с процентом над полосой прогресса. */
+function flashVolume(level) {
+  const label = el('volume-label');
+  label.textContent = `${Math.round(level * 100)}%`;
+  label.classList.add('show');
+
+  clearTimeout(labelTimer);
+  labelTimer = setTimeout(() => label.classList.remove('show'), 1400);
+}
 
 /** Ползунок громкости прячется сам, чтобы не занимать место. */
 function showVolume(open = true) {
@@ -99,6 +111,7 @@ el('seek').addEventListener('click', (event) => {
 
 el('volume').addEventListener('input', (event) => {
   showVolume();
+  flashVolume(Number(event.target.value));
   ipcRenderer.send('kotamusic:miniplayer:action', {
     type: 'volume',
     value: Number(event.target.value),
@@ -117,6 +130,7 @@ document.addEventListener(
 
     el('volume').value = String(value);
     showVolume();
+    flashVolume(value);
     ipcRenderer.send('kotamusic:miniplayer:action', { type: 'volume', value });
   },
   { passive: true }
@@ -129,6 +143,12 @@ ipcRenderer.on('kotamusic:miniplayer:tick', (_event, tick) => {
 
   // Пока ползунок тянут мышью, не перебиваем его значение.
   if (Number.isFinite(tick.volume) && document.activeElement !== el('volume')) {
+    // Громкость могли изменить и в самом клиенте, и горячими клавишами.
+    if (lastVolume !== null && Math.abs(tick.volume - lastVolume) > 0.001) {
+      flashVolume(tick.volume);
+    }
+    lastVolume = tick.volume;
+
     el('volume').value = String(tick.volume);
     el('volume-button').textContent = tick.volume < 0.01 ? '🔇' : tick.volume < 0.5 ? '🔉' : '🔊';
   }
