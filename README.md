@@ -185,4 +185,9 @@ docs/       план работ и картинки
 
 ## Поддержать
 
-[boosty.to/aveharrisan](https://boosty.to/aveharrisan)
+Проект делается в свободное время. Если он вам пригодился:
+
+- **[Boosty](https://boosty.to/aveharrisan)** — разовая или регулярная поддержка
+- **[DonationAlerts](https://www.donationalerts.com/r/aveharrisan)** — разовый донат
+
+Кнопка «Sponsor» в правой колонке репозитория ведёт туда же.
