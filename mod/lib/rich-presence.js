@@ -8,6 +8,7 @@ const { libraryClient } = require('./discord-library');
 const branding = require('../branding');
 const album = require('./album');
 const settings = require('./settings');
+const tweaks = require('./tweaks');
 const bisect = require('./bisect');
 const log = require('./log');
 
@@ -381,6 +382,8 @@ function start() {
 
     // Позиция прошлого трека к новому не относится — иначе полоса
     // покажет чужое время, а проверка перемотки ложно сработает.
+    tweaks.applySleepBlock(Boolean(state?.isPlaying));
+
     if (before?.title !== state?.title) {
       tickState = null;
       albumTitle = null;

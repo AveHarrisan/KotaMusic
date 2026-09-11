@@ -33,6 +33,21 @@ const DEFAULTS = {
   showAlbum: true,
   discordApplicationId: branding.discord.applicationId,
 
+  // Глобальные горячие клавиши поверх других окон.
+  hotkeys: true,
+
+  // Масштаб интерфейса в процентах.
+  zoom: 100,
+
+  // Своя папка кеша (пусто — оставить стандартную).
+  cacheDir: '',
+
+  // Не гасить экран, пока играет музыка.
+  preventSleep: false,
+
+  // Показывать процент при изменении громкости.
+  showVolumePercent: true,
+
   // Дописывать время в строку исполнителя: в карточке голосового канала
   // Discord своего времени не показывает.
   timeInState: true,

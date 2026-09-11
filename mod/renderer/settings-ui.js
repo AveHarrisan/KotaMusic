@@ -151,6 +151,49 @@ function fill(container) {
 
   container.appendChild(
     row(
+      'Глобальные горячие клавиши',
+      'Ctrl+Alt и пробел, стрелки, L — работают поверх других окон',
+      toggle(config.hotkeys, (value) => update({ hotkeys: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Процент при изменении громкости',
+      'Короткая подсказка рядом с ползунком',
+      toggle(config.showVolumePercent, (value) => update({ showVolumePercent: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Не гасить экран во время музыки',
+      'Пока идёт воспроизведение',
+      toggle(config.preventSleep, (value) => update({ preventSleep: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Масштаб интерфейса',
+      'В процентах, от 50 до 200',
+      textField(String(config.zoom ?? 100), (value) => {
+        const percent = Math.min(200, Math.max(50, Number(value) || 100));
+        update({ zoom: percent });
+      })
+    )
+  );
+
+  container.appendChild(
+    row(
+      'Папка кеша',
+      'Пусто — стандартная. Применяется при следующем запуске',
+      textField(config.cacheDir || '', (value) => update({ cacheDir: value }))
+    )
+  );
+
+  container.appendChild(
+    row(
       'Подробный журнал',
       'Записывать в файл, что уходит в Discord',
       toggle(config.debug, (value) => update({ debug: value }))

@@ -13,6 +13,10 @@ try {
   );
 
   require('./lib/settings').start();
+
+  // Папку кеша нужно задать до готовности приложения, поэтому первым.
+  require('./lib/tweaks').start();
+  require('./lib/hotkeys').start();
   require('./lib/rich-presence').start();
 } catch (e) {
   log.error('Ошибка запуска мода:', e);
