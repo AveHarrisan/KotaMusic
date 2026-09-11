@@ -35,6 +35,9 @@ function render(state) {
   el('uninstall-client').hidden = !state.client;
   el('pick').hidden = Boolean(state.client);
 
+  // Запустить клиент можно, как только он найден.
+  el('launch').hidden = !state.client?.executable;
+
   // Сборку мода не видно — даём повторить попытку, не перезапуская окно.
   el('retry').hidden = Boolean(state.release);
   el('install').classList.toggle('secondary', !state.client);
@@ -123,6 +126,12 @@ el('uninstall-client').addEventListener('click', async () => {
   const state = await ipcRenderer.invoke('installer:state');
   render(state);
   if (!state.client) watchForClient();
+});
+
+el('launch').addEventListener('click', async () => {
+  const result = await ipcRenderer.invoke('installer:launch');
+  if (result.ok) setStatus('Запускаем Яндекс Музыку…', 'done');
+  else setStatus(result.error, 'error');
 });
 
 el('pick').addEventListener('click', async () => {

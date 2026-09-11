@@ -16,7 +16,7 @@ let currentRelease = null;
 function create() {
   window = new BrowserWindow({
     width: 520,
-    height: 620,
+    height: 560,
     minHeight: 480,
     resizable: true,
     title: 'KotaMusic',
@@ -194,7 +194,21 @@ async function doUninstallClient() {
   }
 }
 
+/** Запуск клиента прямо из окна: после установки это следующий шаг. */
+async function doLaunch() {
+  const found = client.find();
+  if (!found?.executable) return { ok: false, error: 'Яндекс Музыка не найдена' };
+
+  try {
+    spawn(found.executable, [], { detached: true, stdio: 'ignore' }).unref();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 ipcMain.handle('installer:state', readState);
+ipcMain.handle('installer:launch', doLaunch);
 ipcMain.handle('installer:uninstall-client', doUninstallClient);
 ipcMain.handle('installer:pick-folder', pickFolder);
 ipcMain.handle('installer:install-client', doInstallClient);

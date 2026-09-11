@@ -10,8 +10,8 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 26px;
+    gap: 14px;
+    padding: 24px 26px;
     /* Окно можно растянуть, а если места не хватило — содержимое
        прокручивается, а не обрезается. */
     overflow-y: auto;
@@ -36,12 +36,29 @@
   .row span:last-child { text-align: right; word-break: break-all; }
 
   .actions { display: flex; gap: 10px; }
-  #install-client { margin-top: auto; }
+  .actions button { flex: 1; }
+  /* Строка состояния и кнопка запуска стоят в одной строке. */
+  .state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 20px;
+  }
+
+  .state #status { flex: 1; min-height: 0; }
+  .state:empty { display: none; }
+
+  #launch {
+    flex: none;
+    padding: 8px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
   #pick { font-weight: 500; }
 
   button {
     all: unset;
-    flex: 1;
+    flex: none;
     text-align: center;
     padding: 12px;
     border-radius: 10px;
@@ -71,6 +88,29 @@
   #status.error { color: #ff8080; }
   #status.done { color: #8ce99a; }
 
+  /* Ссылки автора: внизу окна, мелко и не мешая. */
+  .links {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+  }
+
+  .links a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 12px;
+    -webkit-app-region: no-drag;
+  }
+
+  .links a:hover { color: #fff; }
+  .links svg { width: 16px; height: 16px; fill: currentColor; }
+
   progress { width: 100%; height: 6px; accent-color: var(--accent); }
   progress[hidden] { display: none; }
   button[hidden] { display: none; }
@@ -89,12 +129,17 @@
   <div class="row"><span>Файл мода</span><span id="target">—</span></div>
 </div>
 
-<div id="status"></div>
+<div class="state">
+  <div id="status"></div>
+  <button id="launch" class="secondary" hidden>Запустить Яндекс Музыку</button>
+</div>
+
 <progress id="progress" hidden></progress>
 
 <button id="install-client" hidden>Установить Яндекс Музыку</button>
-<button id="uninstall-client" class="secondary" hidden>
-  Удалить Яндекс Музыку — чтобы выбрать другую папку
+<button id="uninstall-client" class="secondary" hidden
+  title="Пока клиент установлен, его установщик не спрашивает папку. Чтобы переехать в другое место, клиент нужно удалить и поставить заново.">
+  Удалить Яндекс Музыку
 </button>
 <button id="pick" class="secondary" hidden>Указать папку с клиентом</button>
 <button id="retry" class="secondary" hidden>Проверить снова</button>
@@ -102,6 +147,36 @@
 <div class="actions">
   <button id="install" disabled>Установить мод</button>
   <button id="uninstall" class="secondary" disabled>Удалить мод</button>
+</div>
+
+<div class="links">
+  <a href="https://boosty.to/aveharrisan" target="_blank" title="Поддержать на Boosty">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M13.6 2 6 13.4h4.3L7.9 22l9.4-12.1h-4.9z" />
+    </svg>
+    Boosty
+  </a>
+
+  <a href="https://www.donationalerts.com/r/aveharrisan" target="_blank" title="Поддержать через DonationAlerts">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21s-7.5-4.7-7.5-10A4.5 4.5 0 0 1 12 7.6 4.5 4.5 0 0 1 19.5 11c0 5.3-7.5 10-7.5 10z" />
+    </svg>
+    DonationAlerts
+  </a>
+
+  <a href="https://github.com/AveHarrisan/KotaMusic" target="_blank" title="Репозиторий на GitHub">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.8-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.7 1a9.3 9.3 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.3.2 2.3.1 2.6.6.8 1 1.7 1 2.8 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0 0 12 2z" />
+    </svg>
+    AveHarrisan
+  </a>
+
+  <a href="https://t.me/aveharrisan" target="_blank" title="Телеграм автора">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21.8 4.3 2.9 11.5c-.9.4-.9 1.1-.2 1.3l4.8 1.5 1.8 5.6c.2.6.4.8 1 .8.4 0 .6-.2.9-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.5c.3-1.3-.5-1.9-1.3-1.6z" />
+    </svg>
+    Telegram
+  </a>
 </div>
 
 <script src="./renderer.js"></script>
