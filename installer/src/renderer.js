@@ -18,6 +18,11 @@ function render(state) {
     : '—';
   el('state').textContent = state.client?.installed ? 'установлен' : 'не установлен';
 
+  // Видно, какой именно файл заменяем: вопрос «куда оно ставится»
+  // возникает первым.
+  el('target').textContent = state.client?.asar || '—';
+  el('target').title = state.client?.asar || '';
+
   el('install').disabled = !state.client || !state.release;
   el('uninstall').disabled = !state.client?.installed || !state.client?.hasBackup;
 
@@ -32,6 +37,10 @@ function render(state) {
 
   if (!state.client) {
     setStatus('Яндекс Музыка не найдена. Установите её — адрес свежей версии берём у Яндекса.');
+  }
+
+  if (state.client && state.release && state.release.exact && !state.client.installed) {
+    setStatus(`Готово к установке: мод под клиент ${state.release.clientVersion} → ${state.client.asar}`);
   }
 
   if (state.client && state.release && !state.release.exact) {
@@ -60,12 +69,17 @@ el('install').addEventListener('click', async () => {
 
 el('install-client').addEventListener('click', async () => {
   el('install-client').disabled = true;
-  setStatus('Качаем и ставим Яндекс Музыку…');
+  setStatus('Качаем Яндекс Музыку…');
   el('progress').hidden = false;
 
   const result = await ipcRenderer.invoke('installer:install-client');
   el('progress').hidden = true;
   el('install-client').disabled = false;
+
+  if (!result.ok && !result.error) {
+    setStatus('Установка отменена.');
+    return;
+  }
 
   if (result.ok && result.dir) {
     setStatus(`Яндекс Музыка ${result.version} установлена в ${result.dir}.`, 'done');

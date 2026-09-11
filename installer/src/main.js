@@ -92,16 +92,30 @@ async function doInstallClient() {
   try {
     const { version, url } = await upstream.latest();
 
+    // Куда ставить — решает человек. По умолчанию предлагаем обычное
+    // место: установщик Яндекса иначе подставит папку прошлой установки,
+    // а она бывает где угодно.
+    let dir = null;
+
+    if (process.platform === 'win32') {
+      const choice = await dialog.showOpenDialog(window, {
+        title: 'Куда поставить Яндекс Музыку',
+        defaultPath: defaultClientDir(),
+        buttonLabel: 'Поставить сюда',
+        properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
+      });
+
+      if (choice.canceled || !choice.filePaths.length) return { ok: false };
+      dir = choice.filePaths[0];
+    }
+
     const file = await upstream.download(url, (ratio) =>
       window?.webContents.send('installer:progress', ratio)
     );
 
-    // На Windows ставим сами и в понятное место: установщик Яндекса
-    // предлагает папку из записи о прошлой установке, а она бывает
-    // где угодно — потом ни найти, ни объяснить.
-    if (process.platform === 'win32') {
-      const dir = defaultClientDir();
-
+    // Ставим сами в выбранную папку: так человек видит, куда всё легло,
+    // и клиент потом точно находится.
+    if (dir) {
       await new Promise((done, fail) => {
         const child = spawn(file, ['/S', `/D=${dir}`], { stdio: 'ignore' });
         child.on('exit', () => done());
