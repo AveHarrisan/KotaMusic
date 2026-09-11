@@ -33,6 +33,13 @@ async function install(info, modPath) {
     await fsp.cp(unpacked, info.asar + '.unpacked', { recursive: true, force: true });
   }
 
+  // Файл с проверкой целостности обязан найтись: без него клиент
+  // с подменённым архивом просто не запустится.
+  if (!target) {
+    await fsp.copyFile(info.backup, info.asar);
+    throw new Error('Не нашёл исполняемый файл клиента — проверку целостности обновить нечем');
+  }
+
   // Windows и macOS проверяют целостность архива — обновляем хеш.
   if (target) {
     try {

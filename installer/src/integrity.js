@@ -77,10 +77,7 @@ function patchExecutable(exePath, asarPath) {
  * и в исполняемом файле на Windows. На Linux её нет вовсе.
  */
 function patchIntegrity(target, asarPath) {
-  if (process.platform === 'darwin' && target && target.endsWith('Info.plist')) {
-    return patchInfoPlist(target, asarPath);
-  }
-
+  if (target && target.endsWith('Info.plist')) return patchInfoPlist(target, asarPath);
   return patchExecutable(target, asarPath);
 }
 

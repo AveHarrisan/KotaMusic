@@ -24,27 +24,31 @@ function candidatePaths() {
   return ['/opt/Яндекс Музыка', path.join(home, '.local', 'share', 'Яндекс Музыка')];
 }
 
-/** Исполняемый файл клиента — по нему правится проверка целостности. */
+/**
+ * Исполняемый файл клиента — по нему правится проверка целостности.
+ * Смотрим на саму папку, а не на систему: установку с одной системы
+ * в папку другой (например из WSL) тоже надо обслуживать правильно.
+ */
 function executableIn(dir) {
-  if (process.platform === 'darwin') {
-    const macos = path.join(dir, 'MacOS');
-    if (!fs.existsSync(macos)) return null;
+  const macos = path.join(dir, 'MacOS');
+
+  if (fs.existsSync(macos)) {
     const found = fs.readdirSync(macos)[0];
     return found ? path.join(macos, found) : null;
   }
 
-  if (process.platform === 'win32') {
-    const files = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.exe'));
-    if (!files.length) return null;
+  const entries = fs.readdirSync(dir);
 
-    // Самый крупный exe — это сам клиент, рядом лежат мелкие служебные.
-    return files
-      .map((f) => path.join(dir, f))
-      .sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0];
-  }
+  // Самый крупный exe — это сам клиент, рядом лежат мелкие служебные.
+  const exe = entries
+    .filter((f) => f.toLowerCase().endsWith('.exe'))
+    .map((f) => path.join(dir, f))
+    .sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0];
 
-  const files = fs.readdirSync(dir).filter((f) => /^yandex/i.test(f));
-  return files.length ? path.join(dir, files[0]) : null;
+  if (exe) return exe;
+
+  const linux = entries.filter((f) => /^(yandex|Яндекс)/i.test(f) && !f.includes('.'));
+  return linux.length ? path.join(dir, linux[0]) : null;
 }
 
 /**
@@ -52,8 +56,6 @@ function executableIn(dir) {
  * рядом с Resources, на остальных системах — сам исполняемый файл.
  */
 function integrityTargetIn(dir, executable) {
-  if (process.platform !== 'darwin') return executable;
-
   const plist = path.join(dir, 'Info.plist');
   return fs.existsSync(plist) ? plist : executable;
 }

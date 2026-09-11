@@ -190,7 +190,7 @@ async function apply(update, onProgress) {
         'taskkill /IM "%~nx1" /F >nul 2>&1',
         'timeout /t 3 /nobreak >nul',
         'set ELECTRON_RUN_AS_NODE=1',
-        `"${executable}" "${script}" "${source}" "${asar}" "${integrity}" "${executable}" 0`,
+        `"${executable}" "${script}" "${source}" "${asar}" "${integrity}" "${executable}" 0 refresh-backup`,
         '',
       ].join('\r\n'),
       'utf8'

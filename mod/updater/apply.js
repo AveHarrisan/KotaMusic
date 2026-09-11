@@ -19,7 +19,13 @@ const { spawn } = require('child_process');
 const fs = require('./fs');
 const { patchIntegrity } = require('./integrity');
 
-const [source, target, integrityTarget, executable, pid, clientInstaller] = process.argv.slice(2);
+const [source, target, integrityTarget, executable, pid, clientArg] = process.argv.slice(2);
+
+// Седьмым доводом приходит либо путь к установщику клиента (его надо
+// выполнить самим), либо слово «refresh-backup» — так cmd сообщает, что
+// клиент он уже переустановил и резервные копии пора сделать заново.
+const clientInstaller = clientArg && clientArg !== 'refresh-backup' ? clientArg : '';
+const clientReinstalled = Boolean(clientArg);
 
 const log = (...args) => {
   const line = `[${new Date().toISOString()}] ${args.join(' ')}\n`;
@@ -164,6 +170,21 @@ async function main() {
   if (clientInstaller) {
     const ok = await updateClient();
     if (!ok) return;
+  }
+
+  if (clientReinstalled) {
+    // Установщик клиента переписывает папку целиком и уносит с собой
+    // резервную копию, сделанную при установке мода. Свежие файлы —
+    // как раз нетронутый оригинал: сохраняем их заново, иначе потом
+    // нечем будет откатиться.
+    for (const file of [target, integrityTarget]) {
+      try {
+        fs.copyFileSync(file, `${file}.original`);
+        log('резервная копия обновлена:', `${file}.original`);
+      } catch (e) {
+        log('резервную копию сделать не вышло:', e.message);
+      }
+    }
   }
 
   if (!freeForWrite(integrityTarget)) {

@@ -105,8 +105,13 @@ ipcMain.handle('installer:install-client', doInstallClient);
 ipcMain.handle('installer:install', doInstall);
 ipcMain.handle('installer:uninstall', doUninstall);
 
-/** Самопроверка: прогоняет то же, что делают кнопки окна. */
+/**
+ * Самопроверка: прогоняет то же, что делают кнопки окна.
+ * KOTAMUSIC_SELFTEST=install — только установка, uninstall — только
+ * удаление, любое другое значение — полный круг.
+ */
 async function selfTest() {
+  const only = process.env.KOTAMUSIC_SELFTEST;
   const state = await readState();
   console.log('состояние:', JSON.stringify({
     клиент: state.client?.dir,
@@ -116,11 +121,15 @@ async function selfTest() {
     установлен: state.client?.installed,
   }, null, 0));
 
-  console.log('установка:', JSON.stringify(await doInstall()));
-  console.log('после установки:', (await readState()).client?.installed);
+  if (only !== 'uninstall') {
+    console.log('установка:', JSON.stringify(await doInstall()));
+    console.log('после установки:', (await readState()).client?.installed);
+  }
 
-  console.log('удаление:', JSON.stringify(await doUninstall()));
-  console.log('после удаления:', (await readState()).client?.installed);
+  if (only !== 'install') {
+    console.log('удаление:', JSON.stringify(await doUninstall()));
+    console.log('после удаления:', (await readState()).client?.installed);
+  }
 
   app.quit();
 }
