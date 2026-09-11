@@ -215,6 +215,8 @@ function start() {
 
   // Кнопка в заголовке клиента.
   ipcMain.on('kotamusic:miniplayer:show', () => {
+    log.debug('Мини-плеер вызван кнопкой в заголовке');
+
     if (alive()) {
       window.show();
       window.focus();
