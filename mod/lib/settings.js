@@ -41,6 +41,9 @@ const DEFAULTS = {
   // Подсказку о кнопке показываем только в первый раз.
   hintShown: false,
 
+  // Отметка о разовом возврате настроек после диагностики 10.09.
+  presetUndone: false,
+
   // Зафиксированное окно становится полупрозрачным и не ловит мышь —
   // на него можно только смотреть.
   miniplayerLocked: false,
@@ -137,10 +140,13 @@ function load() {
   delete values.bisect;
 
   // Диагностический набор от 10.09 гасил название трека в списке
-  // участников и подменял полосу счётчиком. Возвращаем как было.
-  if (values.preset === 'working-2026-09-10') {
+  // участников и подменял полосу счётчиком. Возвращаем как было —
+  // один раз, по собственной отметке: сама отметка набора к этому
+  // времени из части настроек уже удалена.
+  if (!values.presetUndone) {
     values.progress = DEFAULTS.progress;
     values.showTrackInMemberList = DEFAULTS.showTrackInMemberList;
+    values.presetUndone = true;
     migrated = true;
   }
 
