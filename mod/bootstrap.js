@@ -14,6 +14,11 @@ try {
 
   require('./lib/settings').start();
 
+  // Признак читает врезка в клиенте: пока он стоит, клиент сам себя
+  // не обновляет — обновление клиента вместе с модом делает мод.
+  globalThis.__kotamusicHoldUpdates =
+    require('./lib/settings').get().holdClientUpdates !== false;
+
   // Папку кеша нужно задать до готовности приложения, поэтому первым.
   require('./lib/tweaks').start();
   require('./lib/hotkeys').start();

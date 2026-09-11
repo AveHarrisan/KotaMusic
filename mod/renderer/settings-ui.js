@@ -377,6 +377,13 @@ function fill(container) {
       toggle(config.updateCheck !== false, (value) => update({ updateCheck: value }))
     ),
     row(
+      'Обновлять клиент вместе с модом',
+      'Иначе Яндекс Музыка обновится сама и сотрёт мод',
+      toggle(config.holdClientUpdates !== false, (value) =>
+        update({ holdClientUpdates: value })
+      )
+    ),
+    row(
       'Подробный журнал',
       'Записывать в файл, что уходит в Discord',
       toggle(config.debug, (value) => update({ debug: value }))

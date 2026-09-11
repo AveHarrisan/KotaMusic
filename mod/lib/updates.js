@@ -24,6 +24,7 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 
 const branding = require('../branding');
 const settings = require('./settings');
+const upstream = require('./upstream');
 const log = require('./log');
 
 const API = `https://api.github.com/repos/${branding.repositoryUrl.split('github.com/')[1]}/releases`;
@@ -136,7 +137,17 @@ function prepareUpdater() {
 async function apply(update, onProgress) {
   if (!update.asset) throw new Error('В релизе нет файла мода');
 
-  const source = await downloadAsar(update, onProgress);
+  const source = await downloadAsar(update, (share) => onProgress?.(share * (update.clientUrl ? 0.5 : 1)));
+
+  // Клиент обновляем его же официальным установщиком: качаем по адресу,
+  // который даёт сам Яндекс, и запускаем перед подменой архива.
+  let clientInstaller = '';
+
+  if (update.clientUrl) {
+    clientInstaller = await upstream.download(update.clientUrl, (share) =>
+      onProgress?.(0.5 + share * 0.5)
+    );
+  }
   const { asar, integrity, executable } = targets();
   const script = prepareUpdater();
 
@@ -144,7 +155,7 @@ async function apply(update, onProgress) {
 
   spawn(
     process.execPath,
-    [script, source, asar, integrity, executable, String(process.pid)],
+    [script, source, asar, integrity, executable, String(process.pid), clientInstaller],
     {
       detached: true,
       stdio: 'ignore',
@@ -158,32 +169,61 @@ async function apply(update, onProgress) {
 }
 
 function notify(update) {
-  if (announced === update.tag) return;
-  announced = update.tag;
+  const key = `${update.kind}:${update.tag || update.target}`;
+  if (announced === key) return;
+  announced = key;
 
   for (const window of BrowserWindow.getAllWindows()) {
     if (window.isDestroyed() || window.getTitle?.() === branding.name) continue;
     window.webContents.send('kotamusic:update:available', update);
   }
 
-  log.info(`Вышла сборка мода под клиент ${update.clientVersion}`);
+  log.info(
+    update.kind === 'waiting'
+      ? `Вышел клиент ${update.target}, сборка мода под него ещё не готова`
+      : `Есть обновление (${update.kind}): клиент ${update.clientVersion}`
+  );
+}
+
+/**
+ * Что делать дальше: обновить только мод, обновить клиент вместе с модом
+ * или подождать, пока соберётся мод под свежий клиент.
+ */
+async function plan() {
+  const installed = app.getVersion?.() || branding.builtForClient;
+  const release = await latest();
+
+  let official = null;
+  try {
+    official = await upstream.latest();
+  } catch (e) {
+    log.debug('Версию клиента у Яндекса узнать не вышло:', e.message);
+  }
+
+  // Клиент новее нашего: обновляемся вместе, но только когда сборка мода
+  // под эту версию уже есть. Иначе ждём автосборку — она идёт раз в три часа.
+  if (official && newer(official.version, installed)) {
+    if (release && release.clientVersion === official.version) {
+      return { kind: 'client', ...release, installed, clientUrl: official.url, target: official.version };
+    }
+
+    return { kind: 'waiting', installed, target: official.version, url: `${branding.repositoryUrl}/releases` };
+  }
+
+  // Клиент тот же, а сборка мода новее той, из которой мы собраны.
+  if (release && newer(release.clientVersion, branding.builtForClient)) {
+    return { kind: 'mod', ...release, installed: branding.builtForClient };
+  }
+
+  return null;
 }
 
 async function check() {
   if (settings.get().updateCheck === false) return;
 
   try {
-    const update = await latest();
-    if (!update) return;
-
-    const client = app.getVersion?.() || branding.builtForClient;
-
-    // Сообщаем, когда есть сборка под клиент новее того, из которого
-    // собран наш архив. Свежесть самого клиента тут ни при чём: мод
-    // может стоять и на старом.
-    if (!newer(update.clientVersion, branding.builtForClient)) return;
-
-    notify({ ...update, client, installed: branding.builtForClient });
+    const update = await plan();
+    if (update) notify(update);
   } catch (e) {
     log.debug('Проверка обновлений не удалась:', e.message);
   }

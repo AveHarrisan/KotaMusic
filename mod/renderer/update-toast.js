@@ -15,11 +15,20 @@ ipcRenderer.on('kotamusic:update:available', (_event, update) => {
     'font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);' +
     'opacity:0;transition:opacity .2s;-webkit-app-region:no-drag';
 
+  const message = {
+    mod: `Вышла сборка мода под клиент ${update.clientVersion}, у вас стоит сборка под ${update.installed}.`,
+    client:
+      `Вышла Яндекс Музыка ${update.target}, и сборка мода под неё готова. ` +
+      'Обновим вместе — мод останется на месте.',
+    waiting:
+      `Вышла Яндекс Музыка ${update.target}, но сборка мода под неё ещё не готова. ` +
+      'Клиент пока держим на прежней версии, чтобы мод не слетел.',
+  };
+
   const text = document.createElement('div');
   text.innerHTML =
     '<b style="display:block;margin-bottom:4px">KotaMusic</b>' +
-    `Вышла сборка мода под клиент ${update.clientVersion}, ` +
-    `у вас стоит сборка под ${update.installed}.`;
+    (message[update.kind] || message.mod);
 
   box.appendChild(text);
 
@@ -49,13 +58,19 @@ ipcRenderer.on('kotamusic:update:available', (_event, update) => {
   // Обновиться можно прямо отсюда: мод скачает архив, подменит его
   // и перезапустит клиент. Установщик для этого не нужен.
   if (update.asset) {
-    const now = button('Обновить и перезапустить', true);
+    const now = button(
+      update.kind === 'client' ? 'Обновить клиент и мод' : 'Обновить и перезапустить',
+      true
+    );
 
     now.addEventListener('click', (event) => {
       event.stopPropagation();
       now.disabled = true;
       now.textContent = 'Скачиваю…';
-      text.textContent = 'Клиент перезапустится сам, когда файл будет готов.';
+      text.textContent =
+        update.kind === 'client'
+          ? 'Скачиваем клиент и мод. Клиент закроется и запустится сам.'
+          : 'Клиент перезапустится сам, когда файл будет готов.';
       ipcRenderer.send('kotamusic:update:apply', update);
     });
 

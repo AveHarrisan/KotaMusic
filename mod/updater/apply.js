@@ -7,8 +7,11 @@
 // сценарий дожидается освобождения файла, подменяет архив, обновляет
 // проверку целостности и запускает клиент обратно.
 //
+// Если передан установщик клиента, сначала выполняется он: так клиент
+// обновляется вместе с модом, и мод не стирается новым архивом.
+//
 // Запуск: apply.js <новый asar> <app.asar клиента> <файл целостности>
-//         <исполняемый файл> <pid клиента>
+//         <исполняемый файл> <pid клиента> [<установщик клиента>]
 
 const path = require('path');
 const { spawn } = require('child_process');
@@ -16,7 +19,7 @@ const { spawn } = require('child_process');
 const fs = require('./fs');
 const { patchIntegrity } = require('./integrity');
 
-const [source, target, integrityTarget, executable, pid] = process.argv.slice(2);
+const [source, target, integrityTarget, executable, pid, clientInstaller] = process.argv.slice(2);
 
 const log = (...args) => {
   const line = `[${new Date().toISOString()}] ${args.join(' ')}\n`;
@@ -102,12 +105,56 @@ async function replace() {
   return false;
 }
 
+/**
+ * Обновление самого клиента его же установщиком. На Windows он умеет
+ * тихую установку, на остальных системах открываем файл и ждём человека.
+ */
+async function updateClient() {
+  log('ставлю клиент из', clientInstaller);
+
+  if (process.platform !== 'win32') {
+    spawn('xdg-open', [clientInstaller], { detached: true, stdio: 'ignore' }).unref();
+    log('установщик клиента открыт, дальше решает человек');
+    return false;
+  }
+
+  await new Promise((done) => {
+    const child = spawn(clientInstaller, ['/S'], { stdio: 'ignore' });
+    child.on('exit', (code) => {
+      log('установщик клиента завершился с кодом', code);
+      done();
+    });
+    child.on('error', (e) => {
+      log('установщик клиента не запустился:', e.message);
+      done();
+    });
+  });
+
+  // Клиент после тихой установки запускается сам — закрываем его,
+  // иначе он держит файлы, которые нам нужно подменить.
+  await sleep(4000);
+
+  for (const name of [path.basename(executable)]) {
+    try {
+      spawn('taskkill', ['/IM', name, '/F'], { stdio: 'ignore' });
+    } catch {}
+  }
+
+  await sleep(3000);
+  return true;
+}
+
 async function main() {
   log('жду выхода клиента', pid);
 
   if (!(await waitForExit())) {
     log('клиент не закрылся, обновление отменено');
     return;
+  }
+
+  if (clientInstaller) {
+    const ok = await updateClient();
+    if (!ok) return;
   }
 
   if (!freeForWrite(integrityTarget)) {

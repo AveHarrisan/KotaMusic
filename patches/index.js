@@ -17,6 +17,27 @@ const patches = [
   require('./remote-control'),
   require('./preload'),
   {
+    // Обновлениями клиента распоряжается мод: иначе клиент обновит себя
+    // сам и сотрёт мод, как это было у прежних модификаций. Решение
+    // остаётся за человеком — признак ставит сам мод по настройке.
+    id: 'hold-updates',
+    file: 'index.js',
+    apply(code) {
+      const anchor = `  async check() {
+    if (this.updateStatus === UpdateStatus.INSTALLING) {`;
+
+      if (code.includes('__kotamusicHoldUpdates')) return code; // уже наложен
+      if (!code.includes(anchor)) return null;
+
+      return code.replace(
+        anchor,
+        `  async check() {
+    if (globalThis.__kotamusicHoldUpdates) return;
+    if (this.updateStatus === UpdateStatus.INSTALLING) {`
+      );
+    },
+  },
+  {
     id: 'devtools',
     file: 'index.js',
     apply(code) {
