@@ -78,6 +78,11 @@ function setPlaying(value) {
 function start() {
   const init = () => {
     const ok = apply();
+
+    if (!settings.get().taskbarButtons) {
+      return log.info('Кнопки панели задач выключены в настройках');
+    }
+
     const size = icon('play').getSize();
     log.info(
       `Кнопки панели задач: ${ok ? 'установлены' : 'недоступны'}; ` +

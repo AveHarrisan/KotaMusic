@@ -367,11 +367,6 @@ function fill(container) {
       })
     ),
     row(
-      'Папка кеша',
-      'Пусто — стандартная. Применяется при следующем запуске',
-      textField(config.cacheDir || '', (value) => update({ cacheDir: value }))
-    ),
-    row(
       'Проверять обновления мода',
       'Сообщать, когда вышла сборка под свежую версию клиента',
       toggle(config.updateCheck !== false, (value) => update({ updateCheck: value }))

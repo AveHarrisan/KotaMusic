@@ -164,7 +164,18 @@ function showVolume(level) {
   const slider = document.querySelector('[data-test-id="CHANGE_VOLUME_SLIDER"]');
   const box = slider?.getBoundingClientRect();
 
-  if (box && box.width) {
+  // Ползунок бывает и на экране, и спрятанным за краем окна: во втором
+  // случае привязываться к нему нельзя — подпись уедет из виду.
+  const visible =
+    box &&
+    box.width > 0 &&
+    box.height > 0 &&
+    box.top > 40 &&
+    box.bottom < window.innerHeight &&
+    box.left > 0 &&
+    box.right < window.innerWidth;
+
+  if (visible) {
     node.style.left = `${Math.max(8, box.left + box.width / 2 - 20)}px`;
     node.style.top = `${Math.max(8, box.top - 28)}px`;
   } else {

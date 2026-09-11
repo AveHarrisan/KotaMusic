@@ -83,9 +83,6 @@ const DEFAULTS = {
   // Масштаб интерфейса в процентах.
   zoom: 100,
 
-  // Своя папка кеша (пусто — оставить стандартную).
-  cacheDir: '',
-
   // Не гасить экран, пока играет музыка.
   preventSleep: false,
 
@@ -146,6 +143,8 @@ function load() {
 
   delete values.miniplayerHotkey;
   delete values.useLibrary;
+  // Папку кеша клиент задаёт себе сам — настройка ничего не меняла.
+  delete values.cacheDir;
   delete values.bisect;
   delete values.authorStyle;
 

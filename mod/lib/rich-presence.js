@@ -231,7 +231,7 @@ async function connect() {
   previous?.destroy();
 
   const client = new DiscordIPC(clientId, (op, payload) =>
-    log.debug(`Кадр op=${op}:`, JSON.stringify(payload).slice(0, 500))
+    log.debug(`Кадр op=${op}:`, JSON.stringify(payload).slice(0, 2000))
   );
   rpc = client;
   client.on('close', () => {
