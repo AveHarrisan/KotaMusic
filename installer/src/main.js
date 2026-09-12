@@ -74,8 +74,27 @@ async function doInstall() {
       window?.webContents.send('installer:progress', ratio)
     );
 
+    // Клиент держит app.asar открытым, поэтому его приходится закрыть.
+    // Раз уж закрыли сами — сами же и вернём: человек слушал музыку,
+    // а не просил выключить плеер.
+    const wasRunning = client.isRunning(found);
+
+    if (wasRunning) {
+      window?.webContents.send('installer:closing');
+
+      if (!(await client.stop(found))) {
+        return { ok: false, error: 'Не вышло закрыть Яндекс Музыку — закройте её сами и повторите' };
+      }
+    }
+
     await install(found, file);
-    return { ok: true };
+
+    // Запускаем уже обновлённый клиент. Не вышло — это не повод считать
+    // установку неудачной, мод-то на месте.
+    let relaunched = false;
+    if (wasRunning) relaunched = (await doLaunch()).ok;
+
+    return { ok: true, wasRunning, relaunched };
   } catch (e) {
     return { ok: false, error: e.message };
   }

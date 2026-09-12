@@ -215,4 +215,74 @@ function isRunning(info) {
   return false;
 }
 
-module.exports = { find, describe, isRunning, candidatePaths, remember, remembered };
+/**
+ * Закрывает клиент и ждёт, пока он отпустит файлы: подменить app.asar
+ * у работающего клиента нельзя. Сначала просим по-хорошему, потом — силой.
+ */
+async function stop(info, timeoutMs = 15000) {
+  if (!isRunning(info)) return true;
+
+  const name = info.executable ? path.basename(info.executable) : null;
+  const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+  const kill = (force) => {
+    try {
+      if (process.platform === 'win32') {
+        if (!name) return;
+        const args = ['/IM', name, '/T'];
+        if (force) args.push('/F');
+        spawnSync('taskkill', args, { windowsHide: true, timeout: 5000 });
+        return;
+      }
+
+      if (!info.executable) return;
+
+      // pkill по строке убил бы и нас самих, если путь клиента попал
+      // в нашу командную строку. Поэтому список процессов разбираем
+      // сами и свой номер из него выбрасываем.
+      const found = spawnSync('pgrep', ['-f', info.executable], {
+        encoding: 'utf8',
+        timeout: 5000,
+      });
+
+      const pids = (found.stdout || '')
+        .split('\n')
+        .map((line) => Number(line.trim()))
+        .filter((pid) => pid && pid !== process.pid && pid !== process.ppid);
+
+      for (const pid of pids) {
+        try {
+          process.kill(pid, force ? 'SIGKILL' : 'SIGTERM');
+        } catch {}
+      }
+    } catch {}
+  };
+
+  kill(false);
+
+  const deadline = Date.now() + timeoutMs;
+  let forced = false;
+
+  while (Date.now() < deadline) {
+    await sleep(500);
+    if (!isRunning(info)) return true;
+
+    // Не закрылся за первые пять секунд — значит по-хорошему не выйдет.
+    if (!forced && Date.now() > deadline - timeoutMs + 5000) {
+      forced = true;
+      kill(true);
+    }
+  }
+
+  return !isRunning(info);
+}
+
+module.exports = {
+  find,
+  describe,
+  isRunning,
+  stop,
+  candidatePaths,
+  remember,
+  remembered,
+};

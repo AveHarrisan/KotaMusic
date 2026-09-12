@@ -105,6 +105,10 @@ function render(state) {
   }
 }
 
+// Клиент закрываем сами — иначе он держит файл мода. Человек должен
+// понимать, почему у него на середине трека закрылась музыка.
+ipcRenderer.on('installer:closing', () => setStatus('Закрываем Яндекс Музыку…'));
+
 el('install').addEventListener('click', async () => {
   el('install').disabled = true;
   el('uninstall').disabled = true;
@@ -114,8 +118,15 @@ el('install').addEventListener('click', async () => {
   const result = await ipcRenderer.invoke('installer:install');
   el('progress').hidden = true;
 
-  if (result.ok) setStatus('Готово. Запустите Яндекс Музыку.', 'done');
-  else setStatus(result.error, 'error');
+  if (result.ok && result.relaunched) {
+    setStatus('Готово. Яндекс Музыка перезапущена с новым модом.', 'done');
+  } else if (result.ok && result.wasRunning) {
+    setStatus('Мод обновлён, но клиент не запустился сам — откройте его вручную.', 'done');
+  } else if (result.ok) {
+    setStatus('Готово. Запустите Яндекс Музыку.', 'done');
+  } else {
+    setStatus(result.error, 'error');
+  }
 
   render(await ipcRenderer.invoke('installer:state'));
 });
