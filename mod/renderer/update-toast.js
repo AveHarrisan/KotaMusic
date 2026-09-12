@@ -34,6 +34,32 @@ ipcRenderer.on('kotamusic:update:available', (_event, update) => {
 
   box.appendChild(text);
 
+  // Что изменилось: список приходит из CHANGELOG.md вместе со сборкой.
+  // Длинный перечень сворачиваем, иначе сообщение займёт пол-экрана.
+  const notes = Array.isArray(update.notes) ? update.notes.filter(Boolean) : [];
+
+  if (notes.length && update.kind !== 'waiting') {
+    const list = document.createElement('ul');
+    list.style.cssText = 'margin:8px 0 0;padding-left:18px;opacity:.75;line-height:1.35';
+
+    const shown = notes.slice(0, 3);
+    shown.forEach((note) => {
+      const item = document.createElement('li');
+      item.style.marginTop = '3px';
+      item.textContent = note;
+      list.appendChild(item);
+    });
+
+    box.appendChild(list);
+
+    if (notes.length > shown.length) {
+      const more = document.createElement('div');
+      more.style.cssText = 'margin-top:4px;opacity:.5';
+      more.textContent = `и ещё ${notes.length - shown.length} — на странице релиза`;
+      box.appendChild(more);
+    }
+  }
+
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:8px;margin-top:10px;flex-wrap:wrap';
 

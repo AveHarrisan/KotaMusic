@@ -14,6 +14,7 @@ const asar = require('@electron/asar');
 const upstream = require('./lib/upstream');
 const { patches } = require('../patches');
 const branding = require('../mod/branding');
+const changelog = require('./changelog');
 
 const ROOT = path.join(__dirname, '..');
 const WORK = path.join(ROOT, '.work');
@@ -150,7 +151,15 @@ async function main() {
   await fsp.writeFile(
     path.join(OUT, 'build-info.json'),
     JSON.stringify(
-      { clientVersion: version, modVersion, platform, patches: report },
+      {
+        clientVersion: version,
+        modVersion,
+        platform,
+        // Список правок едет рядом с архивом: мод читает этот же файл,
+        // когда показывает, что нового в сборке.
+        notes: changelog.itemsFor(modVersion),
+        patches: report,
+      },
       null,
       2
     )

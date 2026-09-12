@@ -68,13 +68,21 @@ async function latest() {
   // один, а мод внутри него обновляется.
   let modVersion = null;
 
+  // Список правок лежит там же: его показываем в сообщении об обновлении,
+  // чтобы человек видел, за чем именно он обновляется.
+  let notes = [];
+
   if (info) {
     try {
       const response = await fetch(info.browser_download_url, {
         headers: { 'User-Agent': branding.name },
       });
 
-      if (response.ok) modVersion = (await response.json()).modVersion || null;
+      if (response.ok) {
+        const data = await response.json();
+        modVersion = data.modVersion || null;
+        if (Array.isArray(data.notes)) notes = data.notes;
+      }
     } catch (e) {
       log.debug('Версию мода из релиза прочитать не вышло:', e.message);
     }
@@ -84,6 +92,7 @@ async function latest() {
     tag: mod.tag_name,
     clientVersion: mod.tag_name.replace(/^mod-/, ''),
     modVersion,
+    notes,
     url: mod.html_url,
     // Ссылка на сам архив — по ней мод обновляет себя без установщика.
     asset: asset?.browser_download_url || null,

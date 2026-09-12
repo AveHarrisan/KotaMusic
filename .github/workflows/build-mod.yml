@@ -44,6 +44,34 @@ jobs:
           echo "client=$(node -p "require('./dist/build-info.json').clientVersion")" >> $GITHUB_OUTPUT
           echo "mod=$(node -p "require('./dist/build-info.json').modVersion")" >> $GITHUB_OUTPUT
 
+      # Описание релиза собираем файлом: список правок берём из
+      # CHANGELOG.md, а если раздела для этой версии там нет — обходимся
+      # без него, сборку это ронять не должно.
+      - name: Собрать описание релиза
+        env:
+          CLIENT: ${{ steps.info.outputs.client }}
+          MOD: ${{ steps.info.outputs.mod }}
+        run: |
+          {
+            echo "Собрано автоматически для клиента **$CLIENT**, версия мода **$MOD**."
+            echo
+
+            if notes=$(node scripts/changelog.js "$MOD"); then
+              echo "### Что изменилось"
+              echo
+              echo "$notes"
+              echo
+            else
+              echo "В CHANGELOG.md нет раздела для версии $MOD." >&2
+            fi
+
+            echo "Первая установка — через установщик KotaMusic: одной подмены файла"
+            echo "мало, Windows и macOS проверяют целостность \`app.asar\`. Дальше мод"
+            echo "обновляет себя сам."
+          } > release-body.md
+
+          cat release-body.md
+
       # Релиз на версию клиента один, но сам мод внутри него обновляется:
       # сверяем версию мода в выложенном build-info.json с собранной.
       - name: Решить, нужен ли релиз
@@ -81,13 +109,7 @@ jobs:
         with:
           tag_name: mod-${{ steps.info.outputs.client }}
           name: KotaMusic для Яндекс Музыки ${{ steps.info.outputs.client }}
-          body: |
-            Собрано автоматически для клиента **${{ steps.info.outputs.client }}**,
-            версия мода **${{ steps.info.outputs.mod }}**.
-
-            Первая установка — через установщик KotaMusic: одной подмены файла
-            мало, Windows и macOS проверяют целостность `app.asar`. Дальше мод
-            обновляет себя сам.
+          body_path: release-body.md
           files: |
             dist/app.asar
             dist/build-info.json
