@@ -130,9 +130,29 @@ function place() {
 
   const badge = versionBadge();
 
+  // Плашки версии на странице нет — например, в настройках. Тогда обе
+  // кнопки просто стоят в углу, но именно обе: раньше замок оставался
+  // там, где его положили в прошлый раз, и пара разъезжалась.
   if (!badge) {
+    for (const node of [button, lock]) {
+      if (!node) continue;
+      node.style.bottom = '12px';
+      node.style.height = '22px';
+      node.style.borderRadius = '11px';
+      node.style.font = '';
+    }
+
     button.style.right = '12px';
-    button.style.bottom = '12px';
+    button.style.paddingLeft = '12px';
+    button.style.paddingRight = '12px';
+
+    if (lock) {
+      const width = button.getBoundingClientRect().width || 0;
+      lock.style.right = `${Math.round(12 + width + GAP)}px`;
+      lock.style.width = '22px';
+      lock.style.padding = '0';
+    }
+
     return;
   }
 
