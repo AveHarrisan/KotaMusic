@@ -106,12 +106,15 @@ test('анимация Волны слушает признак страницы
 test('управление с телефона включается только своим опытом', { skip }, () => {
   const code = corpus();
 
-  assert.match(code, /if\(\w+==="WebNextYnisonActivityInterception"&&\w*document\.documentElement\.dataset\.kmYnison==="1"\)/);
+  // Клиент спрашивает опыты двумя способами, и оба должны быть накрыты:
+  // Ynison ходит через checkExperiment, а не через getExperiment.
+  assert.match(code, /getExperiment\(\w+\)\{if\(\w+==="WebNextYnisonActivityInterception"/);
+  assert.match(code, /checkExperiment\(\w+,\w+\)\{if\(\w+==="WebNextYnisonActivityInterception"/);
   assert.match(code, /return\{group:"on",value:\{enabled:!0\}\}/);
 
   // Чужие опыты Яндекса не трогаем.
   const forced = code.match(/if\(\w+==="WebNext/g) || [];
-  assert.strictEqual(forced.length, 1, 'врезка вмешалась не в один эксперимент');
+  assert.strictEqual(forced.length, 2, 'врезка вмешалась не в один эксперимент');
 });
 
 test('раздел мода встроен в настройки клиента', { skip }, () => {

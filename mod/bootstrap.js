@@ -30,6 +30,7 @@ try {
   require('./lib/rich-presence').start();
   require('./lib/stream').start();
   require('./lib/window').start();
+  require('./lib/restart').start();
   require('./lib/updates').start();
 
   // Открыть страницу настроек сразу после запуска — удобно для снимков

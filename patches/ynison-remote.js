@@ -15,8 +15,11 @@ const path = require('path');
 const CHUNKS_DIR = 'app/_next/static/chunks';
 const NAME = 'WebNextYnisonActivityInterception';
 
-// Метод модели экспериментов: возвращает описание опыта по имени.
+// Клиент спрашивает эксперименты двумя способами, и оба надо накрыть:
+// getExperiment отдаёт описание опыта, checkExperiment сверяет его группу
+// с ожидаемой. Ynison ходит именно через второй.
 const ANCHOR = /getExperiment\((\w+)\)\{var (\w+);/;
+const CHECK = /checkExperiment\((\w+),(\w+)\)\{let (\w+)=(\w+)\.experiments\[\1\]/;
 
 module.exports = {
   id: 'ynison-remote',
@@ -30,7 +33,8 @@ module.exports = {
         const full = path.join(current, entry.name);
         if (entry.isDirectory()) await walk(full);
         else if (entry.name.endsWith('.js')) {
-          if (ANCHOR.test(await fs.readFile(full, 'utf8'))) hits.push(full);
+          const code = await fs.readFile(full, 'utf8');
+          if (ANCHOR.test(code) || CHECK.test(code)) hits.push(full);
         }
       }
     };
@@ -40,16 +44,31 @@ module.exports = {
   },
 
   apply(code) {
-    if (!ANCHOR.test(code)) return null;
+    if (!ANCHOR.test(code) && !CHECK.test(code)) return null;
+
+    const on = `$1==="${NAME}"&&document.documentElement.dataset.kmYnison==="1"`;
+
+    let patched = code;
 
     // «group» смотрит одна проверка клиента, «value.enabled» — другая,
     // поэтому отвечаем сразу в обоих видах.
-    return code.replace(
+    patched = patched.replace(
       new RegExp(ANCHOR, 'g'),
       'getExperiment($1){' +
-        `if($1==="${NAME}"&&document.documentElement.dataset.kmYnison==="1")` +
+        `if(${on})` +
         'return{group:"on",value:{enabled:!0}};' +
         'var $2;'
     );
+
+    // А здесь клиент спрашивает «этот опыт в такой-то группе?» — для
+    // Ynison он ждёт «on».
+    patched = patched.replace(
+      new RegExp(CHECK, 'g'),
+      'checkExperiment($1,$2){' +
+        `if(${on})return $2==="on";` +
+        'let $3=$4.experiments[$1]'
+    );
+
+    return patched === code ? null : patched;
   },
 };
