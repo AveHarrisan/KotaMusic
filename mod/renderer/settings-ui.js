@@ -231,6 +231,18 @@ function section(title, rows) {
   return wrap;
 }
 
+/** Кнопка «Скопировать»: подтверждает нажатие подписью. */
+function copyButton(text) {
+  const button = actionButton('Скопировать', () => {
+    ipcRenderer.send('kotamusic:copy', text);
+
+    button.textContent = 'Скопировано';
+    setTimeout(() => (button.textContent = 'Скопировать'), 2000);
+  });
+
+  return button;
+}
+
 /** Выбор одного значения из нескольких — вместо выпадающего списка. */
 function choice(options, value, onChange) {
   const row = el('div', 'display:flex;gap:6px;flex:none');
@@ -460,6 +472,8 @@ function fill(container) {
 
   // --- Трансляция --------------------------------------------------------
 
+  const streamAddress = `http://127.0.0.1:${config.streamPort ?? 8462}/`;
+
   const background = ['dark', 'light', 'none'].includes(config.streamBackground)
     ? config.streamBackground
     : 'dark';
@@ -473,10 +487,15 @@ function fill(container) {
       ),
       row(
         'Порт',
-        `Адрес для OBS: http://127.0.0.1:${config.streamPort ?? 8462}/`,
+        'Номер порта, на котором мод отдаёт плашку',
         textField(String(config.streamPort ?? 8462), (value) =>
           update({ streamPort: Math.min(65535, Math.max(1024, Number(value) || 8462)) })
         )
+      ),
+      row(
+        'Адрес для OBS',
+        streamAddress,
+        copyButton(streamAddress)
       ),
       row(
         'Показывать обложку',

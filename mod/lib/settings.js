@@ -291,6 +291,17 @@ function start() {
     }
   });
 
+  // Скопировать строку в буфер: адрес плашки для OBS проще отдать
+  // кнопкой, чем просить переписать его руками.
+  ipcMain.on('kotamusic:copy', (_event, text) => {
+    try {
+      require('electron').clipboard.writeText(String(text || ''));
+      log.info('Скопировано:', text);
+    } catch (e) {
+      log.warn('Скопировать не вышло:', e.message);
+    }
+  });
+
   ipcMain.handle('kotamusic:settings:set', (_event, patch) => {
     if (!patch || typeof patch !== 'object') return values;
 
