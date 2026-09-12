@@ -57,7 +57,10 @@ function payload() {
     playing: Boolean(track?.isPlaying),
     title: track?.title || '',
     artists: track?.artists || [],
-    cover: track?.cover || '',
+    // Обложку отдаём со своего адреса: у страницы в браузере или в OBS
+    // может не быть доступа к серверам Яндекса — расширения, фильтры,
+    // отсутствие сети. А до нас достучаться она может всегда.
+    cover: track?.cover ? `/cover?v=${encodeURIComponent(track.cover)}` : '',
     position: position?.position ?? track?.position ?? null,
     duration: position?.duration ?? track?.duration ?? null,
   };
@@ -306,6 +309,10 @@ function handle(request, response) {
     return;
   }
 
+  if (url === '/cover') {
+    return sendCover(request, response);
+  }
+
   if (url === '/now.json') {
     response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     return response.end(JSON.stringify(payload()));
@@ -318,6 +325,42 @@ function handle(request, response) {
 
   response.writeHead(404);
   response.end();
+}
+
+// Последняя скачанная обложка: страница просит её при каждой смене
+// трека, а сама картинка не меняется — держим в памяти одну.
+let coverCache = { url: null, type: 'image/jpeg', body: null };
+
+async function sendCover(request, response) {
+  const wanted = new URL(request.url, 'http://x').searchParams.get('v') || track?.cover || '';
+
+  if (!/^https:\/\//.test(wanted)) {
+    response.writeHead(404);
+    return response.end();
+  }
+
+  try {
+    if (coverCache.url !== wanted) {
+      const answer = await fetch(wanted, { headers: { 'User-Agent': 'KotaMusic' } });
+      if (!answer.ok) throw new Error(`ответ ${answer.status}`);
+
+      coverCache = {
+        url: wanted,
+        type: answer.headers.get('content-type') || 'image/jpeg',
+        body: Buffer.from(await answer.arrayBuffer()),
+      };
+    }
+
+    response.writeHead(200, {
+      'Content-Type': coverCache.type,
+      'Cache-Control': 'public, max-age=3600',
+    });
+    response.end(coverCache.body);
+  } catch (e) {
+    log.debug('Обложку для плашки достать не вышло:', e.message);
+    response.writeHead(502);
+    response.end();
+  }
 }
 
 function stop() {
