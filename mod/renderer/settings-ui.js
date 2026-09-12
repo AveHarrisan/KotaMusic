@@ -146,15 +146,88 @@ function actionButton(label, onClick) {
   return button;
 }
 
-/** Заголовок группы настроек. */
-function group(title) {
-  const node = el(
-    'div',
-    'margin:18px 0 2px;font-size:12px;font-weight:700;letter-spacing:.04em;' +
-      'text-transform:uppercase;opacity:.45'
+// Какие разделы человек раскрыл. Держим на своей стороне и запоминаем:
+// содержимое пересобирается на каждое изменение настройки, и без этого
+// раздел схлопывался бы от щелчка по переключателю внутри него.
+const OPEN_KEY = 'kotamusic:settings:open';
+
+const openSections = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(OPEN_KEY)) || {};
+  } catch {
+    return {};
+  }
+})();
+
+function rememberOpen() {
+  try {
+    localStorage.setItem(OPEN_KEY, JSON.stringify(openSections));
+  } catch {
+    // Запрет на хранилище — не повод ломать настройки.
+  }
+}
+
+/** «7 настроек»: без этого получалось бы «7 настройка». */
+function countLabel(count) {
+  const two = count % 100;
+  const one = count % 10;
+
+  if (two >= 11 && two <= 14) return `${count} настроек`;
+  if (one === 1) return `${count} настройка`;
+  if (one >= 2 && one <= 4) return `${count} настройки`;
+  return `${count} настроек`;
+}
+
+/**
+ * Раздел настроек: заголовок, по которому раскрывается содержимое.
+ * Полотно из трёх десятков строк иначе приходится пролистывать целиком.
+ */
+function section(title, rows) {
+  const open = Boolean(openSections[title]);
+
+  const wrap = el('div', 'border-top:1px solid rgba(255,255,255,.08)');
+
+  const header = el(
+    'button',
+    'display:flex;align-items:center;gap:12px;width:100%;padding:14px 0;' +
+      'background:none;border:none;cursor:pointer;color:inherit;font-family:inherit;text-align:left'
   );
-  node.textContent = title;
-  return node;
+  header.type = 'button';
+
+  header.appendChild(
+    el(
+      'div',
+      'flex:1;min-width:0;font-size:13px;font-weight:700;letter-spacing:.04em;' +
+        'text-transform:uppercase;opacity:.75',
+      title
+    )
+  );
+
+  header.appendChild(el('div', 'font-size:13px;opacity:.4;flex:none', countLabel(rows.length)));
+
+  const arrow = el(
+    'div',
+    'flex:none;font-size:11px;opacity:.5;transition:transform .15s;' +
+      `transform:rotate(${open ? 0 : -90}deg)`,
+    '▼'
+  );
+  header.appendChild(arrow);
+
+  const body = el('div', `padding-bottom:8px;${open ? '' : 'display:none'}`);
+  rows.forEach((node) => body.appendChild(node));
+
+  header.addEventListener('click', () => {
+    const next = body.style.display === 'none';
+
+    body.style.display = next ? '' : 'none';
+    arrow.style.transform = `rotate(${next ? 0 : -90}deg)`;
+
+    openSections[title] = next;
+    rememberOpen();
+  });
+
+  wrap.append(header, body);
+  return wrap;
 }
 
 function row(title, description, control) {
@@ -187,7 +260,7 @@ async function update(patch) {
 function fill(container) {
   container.textContent = '';
 
-  const header = el('div', 'display:flex;align-items:baseline;gap:8px;padding-top:8px');
+  const header = el('div', 'display:flex;align-items:baseline;gap:8px;padding:8px 0 14px');
   header.appendChild(el('div', 'font-size:20px;font-weight:700', meta.name));
   header.appendChild(el('div', 'font-size:13px;opacity:.5', meta.version));
   container.appendChild(header);
@@ -196,102 +269,104 @@ function fill(container) {
 
   // --- Discord -----------------------------------------------------------
 
-  add(
-    group('Discord'),
-    row(
-      'Rich Presence',
-      'Показывать в Discord, что вы слушаете',
-      toggle(config.richPresence, (value) => update({ richPresence: value }))
-    )
-  );
-
   const counter = config.progress === 'counter';
+
   add(
-    row(
-      'Счётчик времени вместо полосы',
-      counter
-        ? 'Время видно и в профиле, и в карточке голосового канала'
-        : 'Полоса с началом и концом трека — видна только в карточке профиля',
-      toggle(counter, (value) => update({ progress: value ? 'counter' : 'bar' }))
-    ),
-    row(
-      'Время в строке исполнителя',
-      'Единственный способ показать секунды при наведении в голосовом канале',
-      toggle(config.timeInState, (value) => update({ timeInState: value }))
-    ),
-    row(
-      'Название трека в списке участников',
-      'Вместо названия приложения',
-      toggle(config.showTrackInMemberList, (value) => update({ showTrackInMemberList: value }))
-    ),
-    row(
-      'Кнопки под статусом',
-      'Переход к треку и к автору мода',
-      toggle(config.showButtons, (value) => update({ showButtons: value }))
-    ),
-    row(
-      'Показывать альбом',
-      'Третьей строкой статуса вместо надписи «Яндекс Музыка»',
-      toggle(config.showAlbum, (value) => update({ showAlbum: value }))
-    )
+    section('Discord', [
+      row(
+        'Rich Presence',
+        'Показывать в Discord, что вы слушаете',
+        toggle(config.richPresence, (value) => update({ richPresence: value }))
+      ),
+      row(
+        'Счётчик времени вместо полосы',
+        counter
+          ? 'Время видно и в профиле, и в карточке голосового канала'
+          : 'Полоса с началом и концом трека — видна только в карточке профиля',
+        toggle(counter, (value) => update({ progress: value ? 'counter' : 'bar' }))
+      ),
+      row(
+        'Время в строке исполнителя',
+        'Единственный способ показать секунды при наведении в голосовом канале',
+        toggle(config.timeInState, (value) => update({ timeInState: value }))
+      ),
+      row(
+        'Название трека в списке участников',
+        'Вместо названия приложения',
+        toggle(config.showTrackInMemberList, (value) => update({ showTrackInMemberList: value }))
+      ),
+      row(
+        'Кнопки под статусом',
+        'Переход к треку и к автору мода',
+        toggle(config.showButtons, (value) => update({ showButtons: value }))
+      ),
+      row(
+        'Показывать альбом',
+        'Третьей строкой статуса вместо надписи «Яндекс Музыка»',
+        toggle(config.showAlbum, (value) => update({ showAlbum: value }))
+      ),
+    ])
   );
 
   // --- Мини-плеер --------------------------------------------------------
 
   add(
-    group('Мини-плеер'),
-    row(
-      'Показывать мини-плеер',
-      'Маленькое окно поверх других',
-      toggle(config.miniplayer, (value) => update({ miniplayer: value }))
-    ),
-    row(
-      'Перемотка',
-      'Щелчок по полосе задаёт позицию в треке',
-      toggle(config.miniplayerSeek, (value) => update({ miniplayerSeek: value }))
-    ),
-    row(
-      'Громкость',
-      'Ползунок рядом с кнопками',
-      toggle(config.miniplayerVolume, (value) => update({ miniplayerVolume: value }))
-    ),
-    row(
-      'Кнопка закрытия',
-      'Крестик в углу окна',
-      toggle(config.miniplayerClose, (value) => update({ miniplayerClose: value }))
-    ),
-    row(
-      'Кнопка «!» в окне клиента',
-      'Вызывает мини-плеер на прежнем месте; применяется после перезапуска',
-      toggle(config.miniplayerButton, (value) => update({ miniplayerButton: value }))
-    ),
-    row(
-      'Показать подсказку снова',
-      'Короткое пояснение о кнопке при следующем запуске',
-      toggle(!config.hintShown, (value) => update({ hintShown: !value }))
-    ),
-    row(
-      'Компактный вид',
-      'Окно ниже: обложка меньше, исполнитель скрыт',
-      toggle(config.miniplayerCompact, (value) => update({ miniplayerCompact: value }))
-    ),
-    row(
-      'Прятать, когда ничего не играет',
-      'Окно исчезает вместо надписи «Ничего не играет» и возвращается с первым треком',
-      toggle(config.miniplayerHideIdle, (value) => update({ miniplayerHideIdle: value }))
-    ),
-    row(
-      'Зафиксировать окно',
-      'Окно становится полупрозрачным и не ловит мышь — только смотреть',
-      toggle(config.miniplayerLocked, (value) => update({ miniplayerLocked: value }))
-    ),
-    row(
-      'Разблокировка на, секунд',
-      'На столько горячая клавиша снимает фиксацию; отсчёт виден в окне',
-      textField(String(config.miniplayerUnlockSeconds ?? 30), (value) =>
-        update({ miniplayerUnlockSeconds: Math.min(300, Math.max(5, Number(value) || 30)) })
-      )
-    )
+    section('Мини-плеер', [
+      row(
+        'Показывать мини-плеер',
+        'Маленькое окно поверх других',
+        toggle(config.miniplayer, (value) => update({ miniplayer: value }))
+      ),
+      row(
+        'Прятать, когда ничего не играет',
+        'Окно исчезает вместо надписи «Ничего не играет» и возвращается с первым треком',
+        toggle(config.miniplayerHideIdle, (value) => update({ miniplayerHideIdle: value }))
+      ),
+      row(
+        'Компактный вид',
+        'Окно ниже: обложка меньше, исполнитель скрыт',
+        toggle(config.miniplayerCompact, (value) => update({ miniplayerCompact: value }))
+      ),
+      row(
+        'Зафиксировать окно',
+        'Окно становится полупрозрачным и не ловит мышь — только смотреть',
+        toggle(config.miniplayerLocked, (value) => update({ miniplayerLocked: value }))
+      ),
+      row(
+        'Разблокировка на, секунд',
+        'На столько горячая клавиша снимает фиксацию; отсчёт виден в окне',
+        textField(String(config.miniplayerUnlockSeconds ?? 30), (value) =>
+          update({ miniplayerUnlockSeconds: Math.min(300, Math.max(5, Number(value) || 30)) })
+        )
+      ),
+      row(
+        'Кнопка «!» в окне клиента',
+        'Вызывает мини-плеер на прежнем месте; применяется после перезапуска',
+        toggle(config.miniplayerButton, (value) => update({ miniplayerButton: value }))
+      ),
+      row(
+        'Показать подсказку снова',
+        'Короткое пояснение о кнопке при следующем запуске',
+        toggle(!config.hintShown, (value) => update({ hintShown: !value }))
+      ),
+    ]),
+    section('Кнопки в мини-плеере', [
+      row(
+        'Перемотка',
+        'Щелчок по полосе задаёт позицию в треке',
+        toggle(config.miniplayerSeek, (value) => update({ miniplayerSeek: value }))
+      ),
+      row(
+        'Громкость',
+        'Ползунок рядом с кнопками',
+        toggle(config.miniplayerVolume, (value) => update({ miniplayerVolume: value }))
+      ),
+      row(
+        'Кнопка закрытия',
+        'Крестик в углу окна',
+        toggle(config.miniplayerClose, (value) => update({ miniplayerClose: value }))
+      ),
+    ])
   );
 
   // --- Горячие клавиши ---------------------------------------------------
@@ -308,25 +383,18 @@ function fill(container) {
     miniplayerUnlock: 'Снять фиксацию мини-плеера',
   };
 
-  add(group('Горячие клавиши'));
-
-  for (const [action, title] of Object.entries(actions)) {
+  const keyRows = Object.entries(actions).map(([action, title]) => {
     const combination = hotkeys[action];
     const taken = combination && busy.includes(combination);
 
-    add(
-      row(
-        title,
-        taken ? 'Сочетание занято другой программой — выберите другое' : '',
-        hotkeyField(combination, (value) =>
-          update({ hotkeys: { ...hotkeys, [action]: value } })
-        )
-      )
+    return row(
+      title,
+      taken ? 'Сочетание занято другой программой — выберите другое' : '',
+      hotkeyField(combination, (value) => update({ hotkeys: { ...hotkeys, [action]: value } }))
     );
-  }
+  });
 
-  const isDefault =
-    JSON.stringify(hotkeys) === JSON.stringify(defaults.hotkeys ?? {});
+  const isDefault = JSON.stringify(hotkeys) === JSON.stringify(defaults.hotkeys ?? {});
 
   const reset = actionButton('Вернуть по умолчанию', () =>
     update({ hotkeys: { ...defaults.hotkeys } })
@@ -335,59 +403,61 @@ function fill(container) {
   reset.style.opacity = isDefault ? '.4' : '1';
   reset.style.cursor = isDefault ? 'default' : 'pointer';
 
-  add(row('Сбросить сочетания', 'Вернуть набор, который идёт с модом', reset));
+  keyRows.push(row('Сбросить сочетания', 'Вернуть набор, который идёт с модом', reset));
+
+  add(section('Горячие клавиши', keyRows));
 
   // --- Клиент ------------------------------------------------------------
 
   add(
-    group('Клиент'),
-    row(
-      'Кнопки на панели задач',
-      'Управление из миниатюры окна, только в Windows',
-      toggle(config.taskbarButtons, (value) => update({ taskbarButtons: value }))
-    ),
-    row(
-      'Процент при изменении громкости',
-      'Короткая подсказка рядом с ползунком',
-      toggle(config.showVolumePercent, (value) => update({ showVolumePercent: value }))
-    ),
-    row(
-      'Шаг громкости колесом, %',
-      'На столько меняется громкость за одно движение колеса',
-      textField(String(config.volumeStep ?? 1), (value) =>
-        update({ volumeStep: Math.min(25, Math.max(1, Number(value) || 1)) })
-      )
-    ),
-    row(
-      'Не гасить экран во время музыки',
-      'Пока идёт воспроизведение',
-      toggle(config.preventSleep, (value) => update({ preventSleep: value }))
-    ),
-    row(
-      'Масштаб интерфейса',
-      'В процентах, от 50 до 200',
-      textField(String(config.zoom ?? 100), (value) => {
-        const percent = Math.min(200, Math.max(50, Number(value) || 100));
-        update({ zoom: percent });
-      })
-    ),
-    row(
-      'Проверять обновления мода',
-      'Сообщать, когда вышла сборка под свежую версию клиента',
-      toggle(config.updateCheck !== false, (value) => update({ updateCheck: value }))
-    ),
-    row(
-      'Обновлять клиент вместе с модом',
-      'Иначе Яндекс Музыка обновится сама и сотрёт мод',
-      toggle(config.holdClientUpdates !== false, (value) =>
-        update({ holdClientUpdates: value })
-      )
-    ),
-    row(
-      'Подробный журнал',
-      'Записывать в файл, что уходит в Discord',
-      toggle(config.debug, (value) => update({ debug: value }))
-    )
+    section('Клиент', [
+      row(
+        'Кнопки на панели задач',
+        'Управление из миниатюры окна, только в Windows',
+        toggle(config.taskbarButtons, (value) => update({ taskbarButtons: value }))
+      ),
+      row(
+        'Процент при изменении громкости',
+        'Короткая подсказка рядом с ползунком',
+        toggle(config.showVolumePercent, (value) => update({ showVolumePercent: value }))
+      ),
+      row(
+        'Шаг громкости колесом, %',
+        'На столько меняется громкость за одно движение колеса',
+        textField(String(config.volumeStep ?? 1), (value) =>
+          update({ volumeStep: Math.min(25, Math.max(1, Number(value) || 1)) })
+        )
+      ),
+      row(
+        'Не гасить экран во время музыки',
+        'Пока идёт воспроизведение',
+        toggle(config.preventSleep, (value) => update({ preventSleep: value }))
+      ),
+      row(
+        'Масштаб интерфейса',
+        'В процентах, от 50 до 200',
+        textField(String(config.zoom ?? 100), (value) =>
+          update({ zoom: Math.min(200, Math.max(50, Number(value) || 100)) })
+        )
+      ),
+      row(
+        'Проверять обновления мода',
+        'Сообщать, когда вышла сборка под свежую версию клиента',
+        toggle(config.updateCheck !== false, (value) => update({ updateCheck: value }))
+      ),
+      row(
+        'Обновлять клиент вместе с модом',
+        'Иначе Яндекс Музыка обновится сама и сотрёт мод',
+        toggle(config.holdClientUpdates !== false, (value) =>
+          update({ holdClientUpdates: value })
+        )
+      ),
+      row(
+        'Подробный журнал',
+        'Записывать в файл, что уходит в Discord',
+        toggle(config.debug, (value) => update({ debug: value }))
+      ),
+    ])
   );
 }
 
