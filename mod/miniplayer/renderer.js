@@ -41,7 +41,6 @@ function render(track) {
   setTitle(options.compact && artists ? `${track.title} — ${artists}` : track.title);
 
   el('artist').textContent = artists;
-  el('artist').title = artists;
 
   el('cover').src = track.cover || PLACEHOLDER;
   el('play').textContent = track.isPlaying ? '⏸' : '▶';
@@ -53,7 +52,6 @@ function render(track) {
 /** Ставит строку названия и пускает её бегущей, если не помещается. */
 function setTitle(text) {
   const node = el('title');
-  node.title = text;
 
   node.classList.remove('scroll');
   node.textContent = text;
@@ -121,12 +119,10 @@ document.addEventListener('click', (event) => {
     }
 
     el('close').classList.add('armed');
-    el('close').title = 'Нажмите ещё раз, чтобы закрыть';
 
     closeArmed = setTimeout(() => {
       closeArmed = null;
       el('close').classList.remove('armed');
-      el('close').title = 'Закрыть мини-плеер';
     }, 3000);
 
     return;
@@ -174,7 +170,6 @@ el('seek').addEventListener('mousemove', (event) => {
   const x = Math.min(box.width, Math.max(0, event.clientX - box.left));
 
   el('seek-knob').style.left = `${x}px`;
-  el('seek-knob').title = clock((x / box.width) * duration);
 });
 
 // Перемотка: щелчок по полосе задаёт позицию.

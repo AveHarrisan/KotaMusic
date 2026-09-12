@@ -8,6 +8,8 @@ Discord Rich Presence, a mini player, global hotkeys and other things
 the stock client is missing.
 
 [![Discord](https://img.shields.io/badge/Discord-Server-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/XYBvdvfv8t)
+[![Site](https://img.shields.io/badge/Site-lvl.su-ff5c5c?style=flat-square)](https://lvl.su/)
+[![Telegram](https://img.shields.io/badge/Telegram-Kotamarine-229ED9?style=flat-square&logo=telegram&logoColor=white)](https://t.me/kotamarine)
 [![Русский](https://img.shields.io/badge/Язык-Русский-lightgrey?style=flat-square)](../../README.md)
 [![English](https://img.shields.io/badge/Language-English-blue?style=flat-square)](README.md)
 
@@ -190,6 +192,10 @@ Found a bug or want a feature — [open an issue](https://github.com/AveHarrisan
 ## Questions and chat
 
 Discord server — **[discord.com/invite/XYBvdvfv8t](https://discord.com/invite/XYBvdvfv8t)**.
+
+Elsewhere: **[lvl.su](https://lvl.su/)** — game guides and wikis,
+**[Kotamarine](https://t.me/kotamarine)** — Telegram channel about games,
+**[AveHarrisan](https://t.me/aveharrisan)** — the author's Telegram.
 
 The mod carries on the idea of the discontinued **YandexMusicModClient**:
 the same kind of features, but a separate implementation with automatic

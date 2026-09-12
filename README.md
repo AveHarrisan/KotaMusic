@@ -8,6 +8,8 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 которых не хватает обычному клиенту.
 
 [![Discord](https://img.shields.io/badge/Discord-Сервер-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/XYBvdvfv8t)
+[![Сайт](https://img.shields.io/badge/Сайт-lvl.su-ff5c5c?style=flat-square)](https://lvl.su/)
+[![Телеграм](https://img.shields.io/badge/Телеграм-Котамарин-229ED9?style=flat-square&logo=telegram&logoColor=white)](https://t.me/kotamarine)
 [![Русский](https://img.shields.io/badge/Язык-Русский-blue?style=flat-square)](README.md)
 [![English](https://img.shields.io/badge/Language-English-lightgrey?style=flat-square)](docs/en/README.md)
 
@@ -117,6 +119,23 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 
 </details>
 
+### Плашка для трансляции
+
+<details open>
+<summary>Как включить</summary>
+
+Настройки → «Трансляция» → «Плашка «сейчас играет»». Мод поднимает
+страницу по адресу `http://127.0.0.1:8462/` — её добавляют в OBS
+источником «Браузер».
+
+Плашка показывает обложку, название, исполнителя и полосу времени, фон
+у неё прозрачный, а когда играть нечего — она пропадает из кадра. Порт
+можно сменить в тех же настройках.
+
+Адрес слушается только на своей машине: из сети плашка не видна.
+
+</details>
+
 ### Горячие клавиши
 
 <details>
@@ -220,6 +239,15 @@ docs/       план работ и картинки
 
 Сервер в Discord — **[discord.com/invite/XYBvdvfv8t](https://discord.com/invite/XYBvdvfv8t)**.
 Там же можно рассказать об ошибке, если не хочется заводить задачу.
+
+Где меня ещё найти:
+
+- **[lvl.su](https://lvl.su/)** — сайт: гайды и вики по играм
+- **[Котамарин](https://t.me/kotamarine)** — телеграм-канал про игры
+- **[AveHarrisan](https://t.me/aveharrisan)** — личный телеграм
+
+Те же ссылки есть внутри мода — в настройках, раздел «Ссылки», — и в окне
+установщика.
 
 Мод продолжает идею закрытого проекта **YandexMusicModClient**: тот же круг
 возможностей, но своя реализация и автоматические сборки под свежие версии

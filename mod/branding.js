@@ -14,6 +14,18 @@ module.exports = {
   supportUrl: 'https://boosty.to/aveharrisan',
   authorUrl: 'https://t.me/aveharrisan',
 
+  // Куда мод зовёт наружу: показывается в настройках и в установщике.
+  // Держим здесь, чтобы адрес правился в одном месте.
+  links: {
+    site: 'https://lvl.su/',
+    channel: 'https://t.me/kotamarine',
+    author: 'https://t.me/aveharrisan',
+    discord: 'https://discord.com/invite/XYBvdvfv8t',
+    repository: 'https://github.com/AveHarrisan/KotaMusic',
+    boosty: 'https://boosty.to/aveharrisan',
+    donationAlerts: 'https://www.donationalerts.com/r/aveharrisan',
+  },
+
   // Приложение Discord, от имени которого показывается статус.
   // Создаётся на https://discord.com/developers/applications — его название
   // видно в профиле как «слушает <название>».

@@ -7,6 +7,7 @@ const { DiscordIPC } = require('./discord-ipc');
 const branding = require('../branding');
 const album = require('./album');
 const settings = require('./settings');
+const stream = require('./stream');
 const tweaks = require('./tweaks');
 const taskbar = require('./taskbar');
 const miniplayer = require('./miniplayer');
@@ -315,6 +316,7 @@ function start() {
     const previous = tickState;
     tickState = { ...data, at: Date.now() };
     miniplayer.setPosition(data);
+    stream.setPosition(data);
 
     if (previous?.title !== data.title) return;
 
@@ -341,6 +343,7 @@ function start() {
     taskbar.setPlaying(Boolean(state?.isPlaying));
     require('./player').setPlaying(state?.isPlaying);
     miniplayer.setTrack(state);
+    stream.setTrack(state);
 
     if (before?.title !== state?.title) {
       tickState = null;

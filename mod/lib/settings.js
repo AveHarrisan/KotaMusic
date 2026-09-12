@@ -61,6 +61,10 @@ const DEFAULTS = {
   // Кнопки управления в миниатюре окна на панели задач Windows.
   taskbarButtons: true,
 
+  // Плашка «сейчас играет» на локальном адресе — для OBS.
+  stream: false,
+  streamPort: 8462,
+
   // Глобальные горячие клавиши: действие → сочетание. Пустая строка
   // означает, что клавиши у действия нет.
   // Сочетания по умолчанию не заданы: пусть каждый выберет удобные ему
@@ -208,7 +212,14 @@ function start() {
       busy = require('./hotkeys').busy();
     } catch {}
 
-    return { values, defaults: DEFAULTS, version: branding.version, name: branding.name, busy };
+    return {
+      values,
+      defaults: DEFAULTS,
+      version: branding.version,
+      name: branding.name,
+      links: branding.links,
+      busy,
+    };
   });
 
   ipcMain.handle('kotamusic:settings:set', (_event, patch) => {

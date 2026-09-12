@@ -15,6 +15,7 @@ let config = null;
 let defaults = {};
 let busy = [];
 let meta = { name: 'KotaMusic', version: '' };
+let links = {};
 
 const el = (tag, style, text) => {
   const node = document.createElement(tag);
@@ -230,6 +231,19 @@ function section(title, rows) {
   return wrap;
 }
 
+/** Ссылка наружу: клиент открывает её в браузере. */
+function linkButton(label, url) {
+  const node = el(
+    'button',
+    'flex:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;' +
+      'color:inherit;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06)'
+  );
+  node.type = 'button';
+  node.textContent = label;
+  node.addEventListener('click', () => ipcRenderer.send('kotamusic:open-url', url));
+  return node;
+}
+
 function row(title, description, control) {
   const wrap = el('div', 'display:flex;align-items:center;gap:16px;padding:12px 0');
   const texts = el('div', 'flex:1;min-width:0');
@@ -407,6 +421,43 @@ function fill(container) {
 
   add(section('Горячие клавиши', keyRows));
 
+  // --- Трансляция --------------------------------------------------------
+
+  add(
+    section('Трансляция', [
+      row(
+        'Плашка «сейчас играет»',
+        'Компактный плеер по локальному адресу — для OBS и других программ',
+        toggle(config.stream, (value) => update({ stream: value }))
+      ),
+      row(
+        'Порт',
+        `Адрес для OBS: http://127.0.0.1:${config.streamPort ?? 8462}/`,
+        textField(String(config.streamPort ?? 8462), (value) =>
+          update({ streamPort: Math.min(65535, Math.max(1024, Number(value) || 8462)) })
+        )
+      ),
+      row(
+        'Открыть в браузере',
+        'Посмотреть, как плашка выглядит',
+        linkButton('Открыть', `http://127.0.0.1:${config.streamPort ?? 8462}/`)
+      ),
+    ])
+  );
+
+  // --- Ссылки ------------------------------------------------------------
+
+  add(
+    section('Ссылки', [
+      row('Сайт', 'Гайды и вики по играм', linkButton('lvl.su', links.site)),
+      row('Телеграм-канал', 'Новости про игры', linkButton('Котамарин', links.channel)),
+      row('Discord', 'Сервер мода: вопросы и ошибки', linkButton('Сервер', links.discord)),
+      row('Автор', 'Личный телеграм', linkButton('AveHarrisan', links.author)),
+      row('Исходный код', 'Репозиторий мода на GitHub', linkButton('GitHub', links.repository)),
+      row('Поддержать', 'Разовая или регулярная поддержка', linkButton('Boosty', links.boosty)),
+    ])
+  );
+
   // --- Клиент ------------------------------------------------------------
 
   add(
@@ -498,6 +549,7 @@ async function start() {
   defaults = state.defaults || {};
   busy = state.busy || [];
   meta = { name: state.name, version: state.version };
+  links = state.links || {};
 
   // Страница настроек — часть одностраничного приложения: она появляется
   // и исчезает без перезагрузки, поэтому просто следим за деревом.
