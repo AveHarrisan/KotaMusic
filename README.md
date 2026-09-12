@@ -70,7 +70,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 <img src="docs/images/links/aveharrisan.png" width="72" height="72" alt="AveHarrisan"><br>
 <b>AveHarrisan</b>
 </a><br>
-<sub>личный телеграм<br>автора</sub>
+<sub>телеграм<br>автора</sub>
 </td>
 </tr>
 </table>
