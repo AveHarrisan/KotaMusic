@@ -10,6 +10,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 [![Discord](https://img.shields.io/badge/Discord-Сервер-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.com/invite/XYBvdvfv8t)
 [![Сайт](https://img.shields.io/badge/Сайт-lvl.su-ff5c5c?style=flat-square)](https://lvl.su/)
 [![Телеграм](https://img.shields.io/badge/Телеграм-Котамарин-229ED9?style=flat-square&logo=telegram&logoColor=white)](https://t.me/kotamarine)
+[![Автор](https://img.shields.io/badge/Автор-AveHarrisan-229ED9?style=flat-square&logo=telegram&logoColor=white)](https://t.me/aveharrisan)
 [![Русский](https://img.shields.io/badge/Язык-Русский-blue?style=flat-square)](README.md)
 [![English](https://img.shields.io/badge/Language-English-lightgrey?style=flat-square)](docs/en/README.md)
 
@@ -22,6 +23,57 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 [![Загрузок](https://img.shields.io/github/downloads/AveHarrisan/KotaMusic/total?label=Загрузок&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
 [![Последняя сборка](https://img.shields.io/github/v/release/AveHarrisan/KotaMusic?label=Сборка_мода&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
 [![Все файлы](https://img.shields.io/badge/Все_файлы-релизы-lightgrey?style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
+
+### Поддержать и найти меня
+
+Проект делается в свободное время. Если он вам пригодился:
+
+<table>
+<tr>
+<td align="center" width="120">
+<a href="https://boosty.to/aveharrisan">
+<img src="docs/images/links/boosty.png" width="72" height="72" alt="Boosty"><br>
+<b>Boosty</b>
+</a><br>
+<sub>разово или подпиской</sub>
+</td>
+<td align="center" width="120">
+<a href="https://www.donationalerts.com/r/aveharrisan">
+<img src="https://img.shields.io/badge/DA-%20-F57D07?style=for-the-badge&logo=donationalerts&logoColor=white" height="72" alt="DonationAlerts"><br>
+<b>DonationAlerts</b>
+</a><br>
+<sub>разовый донат</sub>
+</td>
+<td align="center" width="120">
+<a href="https://lvl.su/">
+<img src="docs/images/links/lvl.png" width="72" alt="lvl.su"><br>
+<b>lvl.su</b>
+</a><br>
+<sub>гайды и вики</sub>
+</td>
+<td align="center" width="120">
+<a href="https://t.me/kotamarine">
+<img src="https://img.shields.io/badge/TG-%20-229ED9?style=for-the-badge&logo=telegram&logoColor=white" height="72" alt="Котамарин"><br>
+<b>Котамарин</b>
+</a><br>
+<sub>канал про игры</sub>
+</td>
+<td align="center" width="120">
+<a href="https://discord.com/invite/XYBvdvfv8t">
+<img src="docs/images/links/discord.png" width="72" height="72" alt="Discord"><br>
+<b>Discord</b>
+</a><br>
+<sub>вопросы и ошибки</sub>
+</td>
+<td align="center" width="120">
+<a href="https://t.me/aveharrisan">
+<img src="https://img.shields.io/badge/TG-%20-229ED9?style=for-the-badge&logo=telegram&logoColor=white" height="72" alt="AveHarrisan"><br>
+<b>AveHarrisan</b>
+</a><br>
+<sub>телеграм автора</sub>
+</td>
+</tr>
+</table>
 
 </div>
 
@@ -255,9 +307,6 @@ docs/       план работ и картинки
 
 ## Поддержать
 
-Проект делается в свободное время. Если он вам пригодился:
-
-- **[Boosty](https://boosty.to/aveharrisan)** — разовая или регулярная поддержка
-- **[DonationAlerts](https://www.donationalerts.com/r/aveharrisan)** — разовый донат
-
-Кнопка «Sponsor» в правой колонке репозитория ведёт туда же.
+Ссылки — [в начале страницы](#поддержать-и-найти-меня): **Boosty** для разовой
+или регулярной поддержки и **DonationAlerts** для разового доната. Кнопка
+«Sponsor» в правой колонке репозитория ведёт туда же.
