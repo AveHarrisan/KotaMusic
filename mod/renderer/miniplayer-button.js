@@ -134,9 +134,17 @@ function place() {
   // кнопки просто стоят в углу, но именно обе: раньше замок оставался
   // там, где его положили в прошлый раз, и пара разъезжалась.
   if (!badge) {
+    // Над панелью плеера, а не поверх её кнопок.
+    const bar = document.querySelector(PLAYERBAR);
+    const barRect = bar?.getBoundingClientRect();
+    const bottom =
+      barRect && barRect.height
+        ? Math.round(window.innerHeight - barRect.top + 12)
+        : 12;
+
     for (const node of [button, lock]) {
       if (!node) continue;
-      node.style.bottom = '12px';
+      node.style.bottom = `${bottom}px`;
       node.style.height = '22px';
       node.style.borderRadius = '11px';
       node.style.font = '';
