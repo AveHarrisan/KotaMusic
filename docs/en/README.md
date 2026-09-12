@@ -169,7 +169,9 @@ it. A combination already taken by another program is highlighted in red.
   restoring the window
 - **Volume percentage** — a short hint next to the slider, with a custom
   wheel step
-- **Controlling other devices** — run your phone or speaker from the desktop
+- **The computer is visible to Yandex sync** — the client announces itself
+  as "player only", and the mod lifts that restriction. The desktop client
+  has no device picker of its own; switching is done from the phone
 - **Interface scale** — from 50 to 200 percent
 - **Keep the screen awake while music plays**
 
