@@ -16,6 +16,7 @@ const patches = [
   require('./settings-ui'),
   require('./remote-control'),
   require('./vibe-animation'),
+  require('./ynison-remote'),
   require('./preload'),
   {
     // Обновлениями клиента распоряжается мод: иначе клиент обновит себя

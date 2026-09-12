@@ -458,6 +458,40 @@ function fill(container) {
     ])
   );
 
+  // --- Окно и система ----------------------------------------------------
+
+  add(
+    section('Окно и система', [
+      row(
+        'Сворачивать в трей вместо закрытия',
+        'Крестик прячет окно, музыка играет дальше; вернуть — значок у часов',
+        toggle(config.closeToTray, (value) => update({ closeToTray: value }))
+      ),
+      row(
+        'Запускать вместе с системой',
+        'Клиент откроется сам после входа в Windows',
+        toggle(config.autoStart, (value) => update({ autoStart: value }))
+      ),
+      row(
+        'Запускаться свёрнутым',
+        'Окно не будет выскакивать при старте',
+        toggle(config.startMinimized, (value) => update({ startMinimized: value }))
+      ),
+      row(
+        'Аппаратное ускорение',
+        'Выключайте только при полосах и мигании картинки; нужен перезапуск',
+        toggle(config.hardwareAcceleration !== false, (value) =>
+          update({ hardwareAcceleration: value })
+        )
+      ),
+      row(
+        'Управлять этим компьютером с других устройств',
+        'Телефон и колонка смогут переключать музыку здесь; нужен перезапуск',
+        toggle(config.ynisonRemote, (value) => update({ ynisonRemote: value }))
+      ),
+    ])
+  );
+
   // --- Клиент ------------------------------------------------------------
 
   add(

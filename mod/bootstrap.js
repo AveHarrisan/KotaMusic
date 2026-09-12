@@ -19,6 +19,9 @@ try {
   globalThis.__kotamusicHoldUpdates =
     require('./lib/settings').get().holdClientUpdates !== false;
 
+  // Аппаратное ускорение выключается только до готовности приложения.
+  require('./lib/window').applyHardwareAcceleration();
+
   // Папку кеша нужно задать до готовности приложения, поэтому первым.
   require('./lib/tweaks').start();
   require('./lib/hotkeys').start();
@@ -26,6 +29,7 @@ try {
   require('./lib/miniplayer').start();
   require('./lib/rich-presence').start();
   require('./lib/stream').start();
+  require('./lib/window').start();
   require('./lib/updates').start();
 
   // Открыть страницу настроек сразу после запуска — удобно для снимков

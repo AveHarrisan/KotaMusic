@@ -65,6 +65,15 @@ const DEFAULTS = {
   // машинах она ест больше, чем сама музыка.
   liteVibeAnimation: false,
 
+  // Управлять этим компьютером с телефона и колонки.
+  ynisonRemote: false,
+
+  // Окно и система.
+  closeToTray: false,
+  autoStart: false,
+  startMinimized: false,
+  hardwareAcceleration: true,
+
   // Плашка «сейчас играет» на локальном адресе — для OBS.
   stream: false,
   streamPort: 8462,
