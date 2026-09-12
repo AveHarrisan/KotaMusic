@@ -26,6 +26,15 @@ let lastPosition = null;
 let unlockTimer = null;
 let unlockUntil = 0;
 
+// Когда мониторы выключаются, Windows сгоняет окна на оставшийся экран.
+// Это не человек перетащил — запоминать такое место нельзя, а после
+// возвращения мониторов окно нужно вернуть обратно.
+let displaysChangedAt = 0;
+let restoreTimer = null;
+
+const DISPLAY_SETTLE_MS = 8000;
+const RESTORE_DELAY_MS = 2500;
+
 /** Сохранённое место окна, если оно всё ещё помещается на экране. */
 function savedPosition() {
   const saved = settings.get().miniplayerPosition;
@@ -103,6 +112,10 @@ function create() {
   // откроется там же.
   const remember = () => {
     if (!alive()) return;
+
+    // Сразу после перестановки экранов окно двигает система — её выбор
+    // не запоминаем, иначе потеряем место, куда его поставил человек.
+    if (Date.now() - displaysChangedAt < DISPLAY_SETTLE_MS) return;
 
     const [x, y] = window.getPosition();
     settings.set({ miniplayerPosition: { x, y } });
@@ -186,6 +199,38 @@ function startUnlock() {
 
 const alive = () => window && !window.isDestroyed();
 
+/** Возвращает окно туда, где его оставил человек. */
+function restorePosition() {
+  if (!alive()) return;
+
+  const saved = savedPosition();
+  if (!saved) return;
+
+  const [x, y] = window.getPosition();
+  if (x === saved.x && y === saved.y) return;
+
+  window.setPosition(saved.x, saved.y);
+  log.info(`Мини-плеер вернулся на место: ${saved.x}, ${saved.y}`);
+}
+
+/**
+ * Следим за экранами: их выключение и включение переставляет окна, и
+ * своё мы ставим назад сами — система об этом не позаботится.
+ */
+function watchDisplays() {
+  const changed = () => {
+    displaysChangedAt = Date.now();
+
+    // Экраны просыпаются не разом: ждём, пока раскладка устоится.
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(restorePosition, RESTORE_DELAY_MS);
+  };
+
+  screen.on('display-added', changed);
+  screen.on('display-removed', changed);
+  screen.on('display-metrics-changed', changed);
+}
+
 function show() {
   create().show();
   push();
@@ -239,6 +284,8 @@ function setPosition(tick) {
 }
 
 function start() {
+  watchDisplays();
+
   ipcMain.on('kotamusic:miniplayer:ready', () => push());
 
   // Кнопка в углу страницы: открывает мини-плеер и закрывает его.
