@@ -231,6 +231,110 @@ function section(title, rows) {
   return wrap;
 }
 
+/**
+ * Предпросмотр плашки для трансляции: та же карточка, что видит OBS, но
+ * с выдуманным треком. Собирается здесь же, а не тянется со страницы
+ * плашки: показать надо и когда трансляция выключена.
+ */
+function streamPreview(config) {
+  const width = Math.min(1920, Math.max(240, Number(config.streamWidth) || 560));
+  const size = Math.min(160, Math.max(32, Number(config.streamCoverSize) || 56));
+  const font = Math.min(48, Math.max(10, Number(config.streamFontSize) || 16));
+  const accent = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(config.streamAccent || ''))
+    ? config.streamAccent
+    : '#ffdb4d';
+
+  const background = ['dark', 'light', 'none'].includes(config.streamBackground)
+    ? config.streamBackground
+    : 'dark';
+
+  const light = background === 'light';
+  const plain = background === 'none';
+
+  // Кадр с клеткой: на нём видно, что фон плашки прозрачный.
+  const frame = el(
+    'div',
+    'margin:6px 0 4px;padding:16px;border-radius:12px;overflow:hidden;' +
+      'background-color:#3a3a3a;background-image:' +
+      'linear-gradient(45deg,#2f2f2f 25%,transparent 25%,transparent 75%,#2f2f2f 75%),' +
+      'linear-gradient(45deg,#2f2f2f 25%,transparent 25%,transparent 75%,#2f2f2f 75%);' +
+      'background-size:20px 20px;background-position:0 0,10px 10px'
+  );
+
+  const card = el(
+    'div',
+    `display:flex;align-items:center;gap:${Math.round(font * 0.9)}px;box-sizing:border-box;` +
+      `width:${width}px;padding:12px 18px 12px 12px;border-radius:14px;` +
+      `font:${font}px/1.3 "Segoe UI",system-ui,sans-serif;` +
+      (plain
+        ? 'text-shadow:0 2px 6px rgba(0,0,0,.85);color:#fff'
+        : light
+          ? 'background:rgba(245,245,245,.9);color:#141414'
+          : 'background:rgba(20,20,20,.82);color:#fff')
+  );
+
+  if (config.streamCover !== false) {
+    card.appendChild(
+      el(
+        'div',
+        `width:${size}px;height:${size}px;flex:none;border-radius:10px;` +
+          'background:linear-gradient(135deg,#7c5cff,#ff5c8a)'
+      )
+    );
+  }
+
+  const text = el('div', 'flex:1;min-width:0');
+  text.appendChild(
+    el('div', 'font-weight:700;font-size:1.06em;white-space:nowrap;overflow:hidden', 'Кукушка')
+  );
+  text.appendChild(
+    el(
+      'div',
+      `margin-top:2px;font-size:.88em;white-space:nowrap;overflow:hidden;opacity:${light ? '.6' : '.75'}`,
+      'Кино'
+    )
+  );
+
+  if (config.streamBar !== false) {
+    const bar = el(
+      'div',
+      `margin-top:8px;height:3px;border-radius:2px;overflow:hidden;` +
+        `background:${light ? 'rgba(0,0,0,.16)' : 'rgba(255,255,255,.18)'}`
+    );
+    bar.appendChild(el('div', `height:100%;width:36%;background:${accent}`));
+    text.appendChild(bar);
+  }
+
+  if (config.streamTime) {
+    text.appendChild(el('div', 'margin-top:6px;font-size:.8em;opacity:.7', '2:12 / 6:06'));
+  }
+
+  card.appendChild(text);
+
+  // Плашка бывает шире окна настроек — показываем её целиком, уменьшив.
+  const scaler = el('div', 'transform-origin:left top');
+  scaler.appendChild(card);
+  frame.appendChild(scaler);
+
+  // Пока раздел свёрнут, ширины у кадра нет — считать масштаб не по чему.
+  // Поэтому пересчитываем каждый раз, когда кадр меняет размер: при
+  // раскрытии раздела и при изменении окна.
+  const fit = () => {
+    const room = frame.clientWidth - 32;
+    if (room <= 0) return;
+
+    const scale = Math.min(1, room / width);
+
+    scaler.style.transform = scale < 1 ? `scale(${scale})` : '';
+    scaler.style.height = scale < 1 ? `${card.offsetHeight * scale}px` : '';
+  };
+
+  if (typeof ResizeObserver === 'function') new ResizeObserver(fit).observe(frame);
+  requestAnimationFrame(fit);
+
+  return frame;
+}
+
 /** Кнопка «Скопировать»: подтверждает нажатие подписью. */
 function copyButton(text) {
   const button = actionButton('Скопировать', () => {
@@ -559,11 +663,20 @@ function fill(container) {
       ),
       row(
         'Открыть в браузере',
-        'Посмотреть, как плашка выглядит',
-        linkButton('Открыть', `http://127.0.0.1:${config.streamPort ?? 8462}/`)
+        'Посмотреть плашку живьём, с настоящим треком',
+        linkButton('Открыть', streamAddress)
       ),
     ])
   );
+
+  // Предпросмотр идёт отдельным блоком: строка «подпись — управление»
+  // для него слишком тесная.
+  const preview = section('Предпросмотр плашки', [
+    row('Так она выглядит в кадре', 'Клетка показывает прозрачный фон', el('div')),
+    streamPreview(config),
+  ]);
+
+  add(preview);
 
   // --- Ссылки ------------------------------------------------------------
 

@@ -99,7 +99,7 @@ function page() {
     display: flex;
     align-items: center;
     gap: 14px;
-    width: max-content;
+    box-sizing: border-box;
     padding: 12px 18px 12px 12px;
     border-radius: 14px;
     background: rgba(20, 20, 20, .72);
@@ -146,14 +146,30 @@ function page() {
     background: rgba(255, 255, 255, .08);
   }
 
-  .text { min-width: 0; }
+  /* min-width нужен, иначе длинное название растянет блок изнутри
+     и строка не поймёт, что ей не хватает места. */
+  .text { flex: 1; min-width: 0; }
 
   .title {
     font-weight: 700;
     font-size: 1.06em;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
+  }
+
+  /* Название длиннее плашки — пускаем его по кругу. Едет дорожка из двух
+     копий: сдвиг на половину её ширины возвращает картинку в начало. */
+  .title .marquee {
+    display: inline-flex;
+    animation: marquee linear infinite;
+    will-change: transform;
+  }
+
+  .title .marquee > span { padding-right: 48px; }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
   }
 
   .artist {
@@ -200,12 +216,41 @@ function page() {
     return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
   };
 
+  /** Название: коротким — обычной строкой, длинным — бегущей. */
+  function setTitle(text) {
+    const node = el('title');
+    if (node.dataset.text === text) return;
+
+    node.dataset.text = text;
+    node.textContent = text;
+
+    requestAnimationFrame(() => {
+      if (node.scrollWidth <= node.clientWidth + 1) return;
+
+      const span = document.createElement('span');
+      span.textContent = text;
+
+      const track = document.createElement('div');
+      track.className = 'marquee';
+      track.append(span, span.cloneNode(true));
+
+      node.textContent = '';
+      node.appendChild(track);
+
+      // Скорость постоянная: длинное название едет дольше, а не быстрее.
+      track.style.animationDuration = Math.max(6, Math.round(span.offsetWidth / 22)) + 's';
+    });
+  }
+
   function render(data) {
     const view = data.view || {};
     const card = el('card');
 
     document.body.style.fontSize = (view.fontSize || 16) + 'px';
-    card.style.maxWidth = (view.width || 560) + 'px';
+
+    // Ширина задаётся человеком и не пляшет от длины названия: в кадре
+    // плашка должна стоять на месте.
+    card.style.width = (view.width || 560) + 'px';
     card.style.setProperty('--accent', view.accent || '#ffdb4d');
 
     el('cover').style.width = (view.coverSize || 56) + 'px';
@@ -222,7 +267,7 @@ function page() {
     el('card').classList.toggle('idle', !data.title);
     if (!data.title) return;
 
-    el('title').textContent = data.title;
+    setTitle(data.title);
     el('artist').textContent = (data.artists || []).join(', ');
 
     if (data.cover) el('cover').src = data.cover;
