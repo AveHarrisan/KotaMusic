@@ -61,6 +61,10 @@ const DEFAULTS = {
   // Кнопки управления в миниатюре окна на панели задач Windows.
   taskbarButtons: true,
 
+  // Статичная заставка вместо живой анимации Моей Волны: на слабых
+  // машинах она ест больше, чем сама музыка.
+  liteVibeAnimation: false,
+
   // Плашка «сейчас играет» на локальном адресе — для OBS.
   stream: false,
   streamPort: 8462,
@@ -220,6 +224,22 @@ function start() {
       links: branding.links,
       busy,
     };
+  });
+
+  // Часть настроек нужна окну до первой отрисовки: асинхронный ответ
+  // опаздывает, и клиент успевает нарисовать по-своему.
+  ipcMain.on('kotamusic:settings:sync', (event) => {
+    event.returnValue = values;
+  });
+
+  // Окно должно узнавать об изменениях, а не перечитывать по случаю.
+  onChange((now) => {
+    const { BrowserWindow } = require('electron');
+
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (window.isDestroyed()) continue;
+      window.webContents.send('kotamusic:settings:changed', now);
+    }
   });
 
   ipcMain.handle('kotamusic:settings:set', (_event, patch) => {

@@ -480,6 +480,11 @@ function fill(container) {
         )
       ),
       row(
+        'Статичная заставка вместо анимации Волны',
+        'Моя Волна перестанет переливаться — заметно легче для слабых машин',
+        toggle(config.liteVibeAnimation, (value) => update({ liteVibeAnimation: value }))
+      ),
+      row(
         'Не гасить экран во время музыки',
         'Пока идёт воспроизведение',
         toggle(config.preventSleep, (value) => update({ preventSleep: value }))

@@ -15,6 +15,7 @@
 const patches = [
   require('./settings-ui'),
   require('./remote-control'),
+  require('./vibe-animation'),
   require('./preload'),
   {
     // Обновлениями клиента распоряжается мод: иначе клиент обновит себя
