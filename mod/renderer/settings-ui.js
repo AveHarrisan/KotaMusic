@@ -284,13 +284,24 @@ function streamPreview(config) {
   }
 
   const text = el('div', 'flex:1;min-width:0');
+  const custom = config.streamCustomColors;
+  const titleColor = custom ? hexColor(config.streamTitleColor, '') : '';
+  const artistColor = custom ? hexColor(config.streamArtistColor, '') : '';
+  const timeColor = custom ? hexColor(config.streamTimeColor, '') : '';
+
   text.appendChild(
-    el('div', 'font-weight:700;font-size:1.06em;white-space:nowrap;overflow:hidden', 'Кукушка')
+    el(
+      'div',
+      'font-weight:700;font-size:1.06em;white-space:nowrap;overflow:hidden' +
+        (titleColor ? `;color:${titleColor}` : ''),
+      'Кукушка'
+    )
   );
   text.appendChild(
     el(
       'div',
-      `margin-top:2px;font-size:.88em;white-space:nowrap;overflow:hidden;opacity:${light ? '.6' : '.75'}`,
+      'margin-top:2px;font-size:.88em;white-space:nowrap;overflow:hidden' +
+        (artistColor ? `;color:${artistColor};opacity:1` : `;opacity:${light ? '.6' : '.75'}`),
       'Кино'
     )
   );
@@ -306,7 +317,14 @@ function streamPreview(config) {
   }
 
   if (config.streamTime) {
-    text.appendChild(el('div', 'margin-top:6px;font-size:.8em;opacity:.7', '2:12 / 6:06'));
+    text.appendChild(
+      el(
+        'div',
+        'margin-top:6px;font-size:.8em' +
+          (timeColor ? `;color:${timeColor};opacity:1` : ';opacity:.7'),
+        '2:12 / 6:06'
+      )
+    );
   }
 
   card.appendChild(text);
@@ -333,6 +351,28 @@ function streamPreview(config) {
   requestAnimationFrame(fit);
 
   return frame;
+}
+
+/** Цвет принимаем только в виде #rgb или #rrggbb. */
+const hexColor = (value, fallback) =>
+  /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(value || '')) ? value : fallback;
+
+/** Поле цвета: рядом с вводом — образец, чтобы видеть, что набрал. */
+function colorField(value, onChange) {
+  const wrap = el('div', 'display:flex;align-items:center;gap:8px;flex:none');
+
+  const sample = el(
+    'div',
+    'width:22px;height:22px;flex:none;border-radius:6px;' +
+      'border:1px solid rgba(255,255,255,.2);' +
+      `background:${/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(value)) ? value : 'transparent'}`
+  );
+
+  const input = textField(value, onChange);
+  input.style.width = '120px';
+
+  wrap.append(sample, input);
+  return wrap;
 }
 
 /** Кнопка «Скопировать»: подтверждает нажатие подписью. */
@@ -643,10 +683,52 @@ function fill(container) {
       row(
         'Цвет полосы',
         'Шестнадцатеричный цвет, например #ffdb4d',
-        textField(String(config.streamAccent ?? '#ffdb4d'), (value) =>
-          update({ streamAccent: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(value) ? value : '#ffdb4d' })
+        colorField(String(config.streamAccent ?? '#ffdb4d'), (value) =>
+          update({ streamAccent: hexColor(value, '#ffdb4d') })
         )
       ),
+      row(
+        'Свои цвета текста',
+        'Иначе плашка красит текст сама, под выбранную подложку',
+        toggle(config.streamCustomColors, (value) => update({ streamCustomColors: value }))
+      ),
+      ...(config.streamCustomColors
+        ? [
+            row(
+              'Цвет названия',
+              'Строка с названием трека',
+              colorField(String(config.streamTitleColor ?? '#ffffff'), (value) =>
+                update({ streamTitleColor: hexColor(value, '#ffffff') })
+              )
+            ),
+            row(
+              'Цвет исполнителя',
+              'Строка под названием',
+              colorField(String(config.streamArtistColor ?? '#cccccc'), (value) =>
+                update({ streamArtistColor: hexColor(value, '#cccccc') })
+              )
+            ),
+            row(
+              'Цвет времени',
+              'Строка «1:23 / 4:21», если она включена',
+              colorField(String(config.streamTimeColor ?? '#cccccc'), (value) =>
+                update({ streamTimeColor: hexColor(value, '#cccccc') })
+              )
+            ),
+            row(
+              'Вернуть цвета по умолчанию',
+              'Сбросит полосу, название, исполнителя и время',
+              actionButton('Сбросить', () =>
+                update({
+                  streamAccent: defaults.streamAccent,
+                  streamTitleColor: defaults.streamTitleColor,
+                  streamArtistColor: defaults.streamArtistColor,
+                  streamTimeColor: defaults.streamTimeColor,
+                })
+              )
+            ),
+          ]
+        : []),
       row(
         'Размер текста',
         'В пикселях, от 10 до 48',
@@ -655,8 +737,8 @@ function fill(container) {
         )
       ),
       row(
-        'Наибольшая ширина',
-        'В пикселях: длинные названия обрезаются многоточием',
+        'Ширина плашки',
+        'В пикселях. Ширина не меняется от длины названия: длинное едет строкой',
         textField(String(config.streamWidth ?? 560), (value) =>
           update({ streamWidth: Math.min(1920, Math.max(240, Number(value) || 560)) })
         )

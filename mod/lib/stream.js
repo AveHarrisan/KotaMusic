@@ -33,9 +33,20 @@ function view() {
 
   // Цвет принимаем только в виде #rgb или #rrggbb: страницу собираем
   // сами, и чужая строка в стилях нам ни к чему.
-  const accent = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(config.streamAccent || ''))
-    ? config.streamAccent
-    : '#ffdb4d';
+  const color = (value, fallback) =>
+    /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(value || '')) ? value : fallback;
+
+  const accent = color(config.streamAccent, '#ffdb4d');
+
+  // Свои цвета текста — дело добровольное: без них плашка красит себя
+  // сама, под выбранную подложку.
+  const colors = config.streamCustomColors
+    ? {
+        title: color(config.streamTitleColor, '#ffffff'),
+        artist: color(config.streamArtistColor, '#cccccc'),
+        time: color(config.streamTimeColor, '#cccccc'),
+      }
+    : null;
 
   return {
     cover: config.streamCover !== false,
@@ -46,6 +57,7 @@ function view() {
       ? config.streamBackground
       : 'dark',
     accent,
+    colors,
     fontSize: clamp(config.streamFontSize, 10, 48, 16),
     width: clamp(config.streamWidth, 240, 1920, 560),
   };
@@ -259,6 +271,14 @@ function page() {
     el('cover').style.width = (view.coverSize || 56) + 'px';
     el('cover').style.height = (view.coverSize || 56) + 'px';
 
+    // Свои цвета: заданы — красим ими, нет — возвращаем как было.
+    const colors = view.colors || {};
+    el('title').style.color = colors.title || '';
+    el('artist').style.color = colors.artist || '';
+    el('time').style.color = colors.time || '';
+    el('artist').style.opacity = colors.artist ? '1' : '';
+    el('time').style.opacity = colors.time ? '1' : '';
+
     card.classList.toggle('light', view.background === 'light');
     card.classList.toggle('plain', view.background === 'none');
     card.classList.toggle('nocover', view.cover === false);
@@ -423,6 +443,10 @@ function start() {
     // Внешний вид плашки уезжает в уже открытую страницу — в OBS её
     // перезагружать не придётся.
     const looks = [
+      'streamCustomColors',
+      'streamTitleColor',
+      'streamArtistColor',
+      'streamTimeColor',
       'streamCover',
       'streamCoverSize',
       'streamBar',
