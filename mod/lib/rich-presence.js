@@ -364,6 +364,9 @@ function start() {
         state
           ? `Трек: ${state.title} — ${(state.artists || []).join(', ')} ` +
               `[кнопка ${state.control}] ` +
+              // Ссылку пишем в журнал: по ней разбираем жалобы вида
+              // «нажал в Discord на название, а там пусто».
+              `${state.trackUrl ? `<${state.trackUrl}> ` : '<без ссылки> '}` +
               `(${state.isPlaying ? 'играет' : 'пауза'}, ` +
               `${state.position ?? '?'}/${state.duration ?? '?'} с)`
           : 'Плеер пуст'

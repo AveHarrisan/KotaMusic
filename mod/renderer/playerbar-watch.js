@@ -52,7 +52,32 @@ function cleanText(el) {
 /** Ссылки в панели относительные — приводим к обычным адресам. */
 function absolute(href) {
   if (!href) return null;
-  return href.startsWith('http') ? href : WEB_BASE + href;
+
+  // Внутри клиента ссылки записаны параметрами: /album?albumId=9553251.
+  // На сайте такого адреса нет — открывается «Ничего не нашлось», и по
+  // названию трека в Discord человек попадал в пустоту. Переводим их в
+  // обычные адреса сайта.
+  try {
+    const url = new URL(href, `${WEB_BASE}/`);
+    const id = (name) => url.searchParams.get(name);
+
+    if (url.pathname === '/album' && id('albumId')) {
+      const track = id('trackId');
+      return `${WEB_BASE}/album/${id('albumId')}${track ? `/track/${track}` : ''}`;
+    }
+
+    if (url.pathname === '/artist' && id('artistId')) {
+      return `${WEB_BASE}/artist/${id('artistId')}`;
+    }
+
+    if (url.pathname === '/playlist' && id('owner') && id('kind')) {
+      return `${WEB_BASE}/users/${id('owner')}/playlists/${id('kind')}`;
+    }
+
+    return WEB_BASE + url.pathname + url.search;
+  } catch {
+    return href.startsWith('http') ? href : WEB_BASE + href;
+  }
 }
 
 /** Текущая громкость от 0 до 1. */

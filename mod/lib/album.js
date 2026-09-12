@@ -11,10 +11,15 @@ const CACHE_LIMIT = 200;
 
 const cache = new Map();
 
-/** Номер альбома из ссылки вида /album/track?albumId=123&trackId=456 */
+/**
+ * Номер альбома из ссылки. Внутри клиента она записана параметрами
+ * (/album?albumId=123), а наружу мод отдаёт обычный адрес сайта
+ * (/album/123/track/456) — понимаем оба вида.
+ */
 function albumIdFrom(url) {
   if (!url) return null;
-  const found = /[?&]albumId=(\d+)/.exec(url);
+
+  const found = /[?&]albumId=(\d+)/.exec(url) || /\/album\/(\d+)/.exec(url);
   return found ? found[1] : null;
 }
 
