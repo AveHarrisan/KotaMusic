@@ -52,12 +52,21 @@
   /* Если строка не помещается — пускаем её бегущей. */
   #title.scroll { text-overflow: clip; }
 
-  #title.scroll > span {
-    display: inline-block;
-    padding-right: 40px;
+  /* Бежит дорожка целиком, а не каждая копия по отдельности: иначе
+     строка уезжала на половину своей ширины и прыгала назад. */
+  #title.scroll .marquee {
+    display: inline-flex;
     animation: marquee linear infinite;
+    will-change: transform;
   }
 
+  #title.scroll .marquee > span {
+    white-space: nowrap;
+    padding-right: 40px;
+  }
+
+  /* Дорожка из двух одинаковых копий: сдвиг ровно на половину её ширины
+     возвращает картинку в исходное положение — стыка не видно. */
   @keyframes marquee {
     from { transform: translateX(0); }
     to { transform: translateX(-50%); }

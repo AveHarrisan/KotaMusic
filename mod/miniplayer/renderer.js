@@ -63,15 +63,19 @@ function setTitle(text) {
     const span = document.createElement('span');
     span.textContent = text;
 
-    const copy = span.cloneNode(true);
+    // Две одинаковые копии в одной дорожке: пока уезжает первая, на её
+    // место встаёт вторая, и строка идёт по кругу без рывка.
+    const track = document.createElement('div');
+    track.className = 'marquee';
+    track.append(span, span.cloneNode(true));
+
     node.textContent = '';
-    node.append(span, copy);
+    node.appendChild(track);
     node.classList.add('scroll');
 
     // Скорость постоянная: длинная строка едет дольше, а не быстрее.
-    const seconds = Math.max(6, Math.round(span.scrollWidth / 22));
-    span.style.animationDuration = `${seconds}s`;
-    copy.style.animationDuration = `${seconds}s`;
+    const seconds = Math.max(6, Math.round(span.offsetWidth / 22));
+    track.style.animationDuration = `${seconds}s`;
   });
 }
 
