@@ -25,7 +25,27 @@ function render(state) {
   el('mod').textContent = state.release
     ? `${state.release.clientVersion}${state.release.exact ? '' : ' (под другую версию)'}`
     : '—';
+
+  // Версия мода у человека и версия в релизе — из-за них и затевается
+  // обновление: клиент при этом остаётся тем же.
+  el('mod-version').textContent = state.client?.installed
+    ? state.client.modVersion || 'неизвестна'
+    : '—';
+  el('mod-latest').textContent = state.release?.modVersion || '—';
+
   el('state').textContent = state.client?.installed ? 'установлен' : 'не установлен';
+
+  // Своя версия и предложение скачать новую: обновлять себя установщик
+  // не умеет, поэтому просто ведём на страницу релиза.
+  el('installer-version').textContent = state.installer?.version || '—';
+  el('get-installer').hidden = !state.installer?.outdated;
+  el('get-installer').dataset.url = state.installer?.page || '';
+
+  // Проверять обновление мода есть смысл, только когда он стоит.
+  el('check-mod').hidden = !state.client?.installed;
+
+  // Мод устарел — главная кнопка окна становится обновлением.
+  el('install').textContent = state.modOutdated ? 'Обновить мод' : 'Установить мод';
 
   // Видно, какой именно файл заменяем: вопрос «куда оно ставится»
   // возникает первым.
@@ -55,6 +75,21 @@ function render(state) {
 
   if (!state.client) {
     setStatus('Яндекс Музыка не найдена. Установите её — адрес свежей версии берём у Яндекса.');
+  }
+
+  if (state.modOutdated) {
+    setStatus(
+      `Вышла версия мода ${state.release.modVersion}, у вас ${state.client.modVersion}. ` +
+        'Нажмите «Обновить мод» — клиент трогать не нужно.'
+    );
+  } else if (state.client?.installed && state.release?.modVersion) {
+    setStatus(`Мод ${state.client.modVersion} — свежее некуда.`, 'done');
+  }
+
+  if (state.installer?.outdated) {
+    setStatus(
+      `Вышла новая версия установщика ${state.installer.latest}, у вас ${state.installer.version}.`
+    );
   }
 
   if (state.client && state.release && state.release.exact && !state.client.installed) {
@@ -199,3 +234,23 @@ function watchForClient() {
     );
   }
 })();
+
+el('check-mod').addEventListener('click', async () => {
+  el('check-mod').disabled = true;
+  setStatus('Смотрим, что выложено на GitHub…');
+
+  const state = await ipcRenderer.invoke('installer:state');
+  el('check-mod').disabled = false;
+
+  render(state);
+
+  // render() говорит про обновление сам, а вот молчание надо объяснить:
+  // без строки кажется, что кнопка не сработала.
+  if (!state.release?.modVersion) {
+    setStatus('Версию мода на GitHub узнать не вышло — попробуйте позже.', 'error');
+  }
+});
+
+el('get-installer').addEventListener('click', () => {
+  ipcRenderer.invoke('installer:open', el('get-installer').dataset.url);
+});

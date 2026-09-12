@@ -55,6 +55,16 @@ async function directRelease(clientVersion) {
     const head = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': 'KotaMusic' } });
     if (!head.ok) return null;
 
+    // Номер версии мода лежит рядом, по такой же постоянной ссылке.
+    let modVersion = null;
+    try {
+      const info = await fetch(
+        `https://github.com/${REPO}/releases/download/${tag}/build-info.json`,
+        { headers: { 'User-Agent': 'KotaMusic' } }
+      );
+      if (info.ok) modVersion = (await info.json()).modVersion || null;
+    } catch {}
+
     return {
       tag,
       name: `KotaMusic для Яндекс Музыки ${clientVersion}`,
@@ -62,8 +72,29 @@ async function directRelease(clientVersion) {
       url,
       size: Number(head.headers.get('content-length')) || 0,
       clientVersion,
+      modVersion,
       exact: true,
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Версия самого мода в релизе: релиз на версию клиента один, а мод
+ * внутри него обновляется, поэтому номер лежит рядом с архивом.
+ */
+async function modVersionOf(release) {
+  const info = release.assets?.find((a) => a.name === 'build-info.json');
+  if (!info) return null;
+
+  try {
+    const response = await fetch(info.browser_download_url, {
+      headers: { 'User-Agent': 'KotaMusic' },
+    });
+
+    if (!response.ok) return null;
+    return (await response.json()).modVersion || null;
   } catch {
     return null;
   }
@@ -115,6 +146,7 @@ async function findRelease(clientVersion) {
   if (!asset) throw new Error(`В релизе ${chosen.tag_name} нет файла мода`);
 
   return {
+    modVersion: await modVersionOf(chosen),
     tag: chosen.tag_name,
     name: chosen.name,
     notes: chosen.body,

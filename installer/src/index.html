@@ -111,6 +111,8 @@
   .links a:hover { color: #fff; }
   .links svg { width: 16px; height: 16px; fill: currentColor; }
 
+  .about { margin-top: 14px; text-align: center; font-size: 12px; color: var(--muted); }
+
   progress { width: 100%; height: 6px; accent-color: var(--accent); }
   progress[hidden] { display: none; }
   button[hidden] { display: none; }
@@ -124,7 +126,9 @@
 <div class="card">
   <div class="row"><span>Клиент</span><span id="client">ищем…</span></div>
   <div class="row"><span>Версия клиента</span><span id="version">—</span></div>
-  <div class="row"><span>Мод</span><span id="mod">—</span></div>
+  <div class="row"><span>Сборка под клиент</span><span id="mod">—</span></div>
+  <div class="row"><span>Версия мода</span><span id="mod-version">—</span></div>
+  <div class="row"><span>Мод на GitHub</span><span id="mod-latest">—</span></div>
   <div class="row"><span>Состояние</span><span id="state">—</span></div>
   <div class="row"><span>Файл мода</span><span id="target">—</span></div>
 </div>
@@ -143,11 +147,15 @@
 </button>
 <button id="pick" class="secondary" hidden>Указать папку с клиентом</button>
 <button id="retry" class="secondary" hidden>Проверить снова</button>
+<button id="check-mod" class="secondary">Проверить обновление мода</button>
+<button id="get-installer" class="secondary" hidden>Скачать новую версию установщика</button>
 
 <div class="actions">
   <button id="install" disabled>Установить мод</button>
   <button id="uninstall" class="secondary" disabled>Удалить мод</button>
 </div>
+
+<div class="about">Установщик <span id="installer-version">—</span></div>
 
 <div class="links">
   <a href="https://boosty.to/aveharrisan" target="_blank" title="Поддержать на Boosty">

@@ -71,9 +71,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      # Версию кладём в релиз отдельным файлом: имена самих сборок
+      # постоянные, и узнать по ним, что вышло новее, нельзя.
+      - name: Записать версию установщика
+        run: |
+          version=$(node -p "require('./installer/package.json').version")
+          printf '{\n  "version": "%s",\n  "date": "%s"\n}\n' \
+            "$version" "$(date -u +%Y-%m-%d)" > artifacts/installer-info.json
+          cat artifacts/installer-info.json
 
       - name: Выложить релиз
         uses: softprops/action-gh-release@v2

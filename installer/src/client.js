@@ -159,6 +159,9 @@ function describe(dir) {
   let version = null;
   let installed = false;
 
+  // Версия самого мода: её проставляет сборка в брендинге внутри архива.
+  let modVersion = null;
+
   try {
     version = JSON.parse(extractFile(asar, 'package.json').toString()).version;
 
@@ -167,6 +170,13 @@ function describe(dir) {
     // держим и после удаления мода.
     installed = Boolean(readHeader(asar).header.files?.kotamusic);
   } catch {}
+
+  if (installed) {
+    try {
+      const branding = extractFile(asar, 'kotamusic/branding.js').toString();
+      modVersion = branding.match(/version:\s*'([^']+)'/)?.[1] || null;
+    } catch {}
+  }
 
   const backup = asar + '.original';
 
@@ -178,6 +188,7 @@ function describe(dir) {
     uninstaller: uninstallerIn(dir),
     integrityTarget: integrityTargetIn(dir, executableIn(dir)),
     version,
+    modVersion,
     installed,
     hasBackup: fs.existsSync(backup),
   };

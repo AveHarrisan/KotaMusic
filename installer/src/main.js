@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 
 const client = require('./client');
+const self = require('./self');
 const releases = require('./releases');
 const upstream = require('./upstream');
 const { install, uninstall } = require('./install');
@@ -48,7 +49,19 @@ async function readState() {
     currentRelease = null;
   }
 
-  return { client: found, release: currentRelease };
+  // Про свою версию установщик спрашивает GitHub заодно с модом:
+  // лишнего ожидания это не создаёт, запросы идут вместе.
+  const installer = await self.state();
+
+  // Мод стоит, а в релизе он новее — это и есть повод обновиться.
+  const modOutdated = Boolean(
+    found?.installed &&
+      found.modVersion &&
+      currentRelease?.modVersion &&
+      self.newer(currentRelease.modVersion, found.modVersion)
+  );
+
+  return { client: found, release: currentRelease, installer, modOutdated };
 }
 
 async function doInstall() {
@@ -221,6 +234,7 @@ ipcMain.on('installer:fit', (_event, height) => {
 });
 
 ipcMain.handle('installer:state', readState);
+ipcMain.handle('installer:open', (_event, url) => shell.openExternal(url));
 ipcMain.handle('installer:launch', doLaunch);
 ipcMain.handle('installer:uninstall-client', doUninstallClient);
 ipcMain.handle('installer:pick-folder', pickFolder);
