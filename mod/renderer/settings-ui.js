@@ -276,6 +276,11 @@ function fill(container) {
       toggle(config.miniplayerCompact, (value) => update({ miniplayerCompact: value }))
     ),
     row(
+      'Прятать, когда ничего не играет',
+      'Окно исчезает вместо надписи «Ничего не играет» и возвращается с первым треком',
+      toggle(config.miniplayerHideIdle, (value) => update({ miniplayerHideIdle: value }))
+    ),
+    row(
       'Зафиксировать окно',
       'Окно становится полупрозрачным и не ловит мышь — только смотреть',
       toggle(config.miniplayerLocked, (value) => update({ miniplayerLocked: value }))

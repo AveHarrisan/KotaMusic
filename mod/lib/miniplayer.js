@@ -199,8 +199,18 @@ function push() {
   window.webContents.send('kotamusic:miniplayer:track', lastTrack);
 }
 
+const hideIdle = () => Boolean(settings.get().miniplayerHideIdle);
+
 function setTrack(track) {
   lastTrack = track;
+
+  // Окно скрываем только само по себе: настройку не трогаем, иначе мод
+  // решит, что мини-плеер выключили, и не вернёт его с первым же треком.
+  if (settings.get().miniplayer && hideIdle()) {
+    if (!track) return hide();
+    if (!alive()) return show();
+  }
+
   push();
 }
 
@@ -243,6 +253,13 @@ function start() {
   settings.onChange((now, before) => {
     if (now.miniplayer !== before.miniplayer) return now.miniplayer ? show() : hide();
 
+    // Настройку переключили при пустом плеере — окно должно пропасть
+    // или вернуться сразу, не дожидаясь смены трека.
+    if (now.miniplayerHideIdle !== before.miniplayerHideIdle && now.miniplayer) {
+      if (now.miniplayerHideIdle && !lastTrack) return hide();
+      if (!now.miniplayerHideIdle && !alive()) return show();
+    }
+
     if (now.miniplayerCompact !== before.miniplayerCompact && alive()) {
       // Размер меняем, место сохраняем — окно не должно прыгать.
       const [x, y] = window.getPosition();
@@ -259,7 +276,12 @@ function start() {
   });
 
   const init = () => {
-    if (settings.get().miniplayer) show();
+    if (!settings.get().miniplayer) return;
+
+    // При запуске трека ещё нет: с этой настройкой окно ждёт первого.
+    if (hideIdle()) return;
+
+    show();
   };
 
   if (app.isReady()) init();
