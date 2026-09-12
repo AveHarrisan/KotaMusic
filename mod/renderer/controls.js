@@ -12,6 +12,10 @@ const ID = {
   next: ['NEXT_TRACK_BUTTON'],
   previous: ['PREVIOUS_TRACK_BUTTON'],
   like: ['LIKE_BUTTON'],
+  // У повтора три состояния, у перемешивания два — метка кнопки
+  // меняется вместе с ними, поэтому перечисляем все.
+  repeat: ['REPEAT_BUTTON_NO_REPEAT', 'REPEAT_BUTTON_REPEAT_CONTEXT', 'REPEAT_BUTTON_REPEAT_ONE'],
+  shuffle: ['SHUFFLE_BUTTON', 'SHUFFLE_BUTTON_ON'],
   volume: ['CHANGE_VOLUME_SLIDER'],
 };
 

@@ -32,6 +32,13 @@ const DEFAULTS = {
   // Компактный вид: то же окно, но ниже и плотнее.
   miniplayerCompact: false,
 
+  // Окно мини-плеера можно тянуть за край, размер запоминается.
+  miniplayerResizable: false,
+  miniplayerSize: null,
+
+  // Мини-плеер в панели задач: по умолчанию его там нет.
+  miniplayerTaskbar: false,
+
   // Прятать окно, пока играть нечего: вместо надписи «Ничего не играет»
   // на экране не остаётся ничего.
   miniplayerHideIdle: false,
@@ -68,8 +75,16 @@ const DEFAULTS = {
   // Управлять этим компьютером с телефона и колонки.
   ynisonRemote: false,
 
+  // Внешний вид панели плеера клиента.
+  playerAlwaysTimecode: false,
+  playerFlatColors: false,
+  playerThickBar: false,
+
   // Окно и система.
   closeToTray: false,
+  startupPage: '',
+  rememberWindowSize: false,
+  windowSize: null,
   autoStart: false,
   startMinimized: false,
   hardwareAcceleration: true,
@@ -77,6 +92,11 @@ const DEFAULTS = {
   // Плашка «сейчас играет» на локальном адресе — для OBS.
   stream: false,
   streamPort: 8462,
+
+  // Как выглядит плашка в кадре.
+  streamCover: true,
+  streamLight: false,
+  streamFontSize: 16,
 
   // Глобальные горячие клавиши: действие → сочетание. Пустая строка
   // означает, что клавиши у действия нет.
@@ -91,6 +111,8 @@ const DEFAULTS = {
     like: '',
     miniplayer: '',
     miniplayerUnlock: '',
+    repeat: '',
+    shuffle: '',
   },
 
   // Масштаб интерфейса в процентах.

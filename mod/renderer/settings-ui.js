@@ -354,6 +354,16 @@ function fill(container) {
         )
       ),
       row(
+        'Менять размер окна',
+        'Окно можно тянуть за край, размер запоминается',
+        toggle(config.miniplayerResizable, (value) => update({ miniplayerResizable: value }))
+      ),
+      row(
+        'Показывать в панели задач',
+        'Обычно мини-плеер там не нужен',
+        toggle(config.miniplayerTaskbar, (value) => update({ miniplayerTaskbar: value }))
+      ),
+      row(
         'Кнопка «!» в окне клиента',
         'Вызывает мини-плеер на прежнем месте; применяется после перезапуска',
         toggle(config.miniplayerButton, (value) => update({ miniplayerButton: value }))
@@ -395,6 +405,8 @@ function fill(container) {
     like: 'Лайк',
     miniplayer: 'Показать мини-плеер',
     miniplayerUnlock: 'Снять фиксацию мини-плеера',
+    repeat: 'Повтор',
+    shuffle: 'Перемешать',
   };
 
   const keyRows = Object.entries(actions).map(([action, title]) => {
@@ -438,6 +450,23 @@ function fill(container) {
         )
       ),
       row(
+        'Показывать обложку',
+        'Без неё плашка становится узкой строкой',
+        toggle(config.streamCover !== false, (value) => update({ streamCover: value }))
+      ),
+      row(
+        'Светлый вид',
+        'Для трансляций со светлой картинкой',
+        toggle(config.streamLight, (value) => update({ streamLight: value }))
+      ),
+      row(
+        'Размер текста',
+        'В пикселях, от 10 до 48',
+        textField(String(config.streamFontSize ?? 16), (value) =>
+          update({ streamFontSize: Math.min(48, Math.max(10, Number(value) || 16)) })
+        )
+      ),
+      row(
         'Открыть в браузере',
         'Посмотреть, как плашка выглядит',
         linkButton('Открыть', `http://127.0.0.1:${config.streamPort ?? 8462}/`)
@@ -455,6 +484,28 @@ function fill(container) {
       row('Автор', 'Личный телеграм', linkButton('AveHarrisan', links.author)),
       row('Исходный код', 'Репозиторий мода на GitHub', linkButton('GitHub', links.repository)),
       row('Поддержать', 'Разовая или регулярная поддержка', linkButton('Boosty', links.boosty)),
+    ])
+  );
+
+  // --- Панель плеера -----------------------------------------------------
+
+  add(
+    section('Панель плеера', [
+      row(
+        'Всегда показывать время трека',
+        'Обычно время видно только при наведении',
+        toggle(config.playerAlwaysTimecode, (value) => update({ playerAlwaysTimecode: value }))
+      ),
+      row(
+        'Не перекрашивать под обложку',
+        'Панель остаётся тёмной, а не берёт цвет у картинки альбома',
+        toggle(config.playerFlatColors, (value) => update({ playerFlatColors: value }))
+      ),
+      row(
+        'Полоса времени толще',
+        'По ней же перематывают — в неё проще попасть',
+        toggle(config.playerThickBar, (value) => update({ playerThickBar: value }))
+      ),
     ])
   );
 
@@ -476,6 +527,16 @@ function fill(container) {
         'Запускаться свёрнутым',
         'Окно не будет выскакивать при старте',
         toggle(config.startMinimized, (value) => update({ startMinimized: value }))
+      ),
+      row(
+        'Запоминать размер окна',
+        'Клиент откроется того же размера, каким его закрыли',
+        toggle(config.rememberWindowSize, (value) => update({ rememberWindowSize: value }))
+      ),
+      row(
+        'Стартовая страница',
+        'Адрес внутри клиента: /search, /collection, /non-music; пусто — как обычно',
+        textField(String(config.startupPage ?? ''), (value) => update({ startupPage: value }))
       ),
       row(
         'Аппаратное ускорение',

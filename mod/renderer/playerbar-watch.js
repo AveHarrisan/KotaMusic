@@ -61,7 +61,9 @@ function absolute(href) {
     const url = new URL(href, `${WEB_BASE}/`);
     const id = (name) => url.searchParams.get(name);
 
-    if (url.pathname === '/album' && id('albumId')) {
+    // В панели плеера ссылка выглядит как /album/track?albumId=..&trackId=..,
+    // на странице альбома — как /album?albumId=..
+    if ((url.pathname === '/album' || url.pathname === '/album/track') && id('albumId')) {
       const track = id('trackId');
       return `${WEB_BASE}/album/${id('albumId')}${track ? `/track/${track}` : ''}`;
     }

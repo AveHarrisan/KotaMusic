@@ -24,8 +24,19 @@ const port = () => Math.min(65535, Math.max(1024, Number(settings.get().streamPo
 const address = () => `http://${HOST}:${port()}/`;
 
 /** То, что видит страница: трек, позиция и настройки показа. */
+function view() {
+  const size = Math.min(48, Math.max(10, Number(settings.get().streamFontSize) || 16));
+
+  return {
+    cover: settings.get().streamCover !== false,
+    light: Boolean(settings.get().streamLight),
+    fontSize: size,
+  };
+}
+
 function payload() {
   return {
+    view: view(),
     playing: Boolean(track?.isPlaying),
     title: track?.title || '',
     artists: track?.artists || [],
@@ -81,6 +92,14 @@ function page() {
 
   .card.idle { display: none; }
 
+  /* Светлый вид — для трансляций со светлой картинкой. */
+  .card.light { background: rgba(245, 245, 245, .82); color: #141414; }
+  .card.light .artist { opacity: .6; }
+  .card.light .bar { background: rgba(0, 0, 0, .16); }
+
+  /* Без обложки плашка становится узкой строкой. */
+  .card.nocover img { display: none; }
+
   img {
     width: 56px;
     height: 56px;
@@ -94,7 +113,7 @@ function page() {
 
   .title {
     font-weight: 700;
-    font-size: 17px;
+    font-size: 1.06em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -103,7 +122,7 @@ function page() {
   .artist {
     margin-top: 2px;
     opacity: .75;
-    font-size: 14px;
+    font-size: .88em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -138,6 +157,12 @@ function page() {
   const el = (id) => document.getElementById(id);
 
   function render(data) {
+    const view = data.view || {};
+
+    document.body.style.fontSize = (view.fontSize || 16) + 'px';
+    el('card').classList.toggle('light', Boolean(view.light));
+    el('card').classList.toggle('nocover', view.cover === false);
+
     // Играть нечего — плашку прячем целиком: пустая карточка в кадре
     // выглядит так, будто трансляция сломалась.
     el('card').classList.toggle('idle', !data.title);
@@ -237,7 +262,17 @@ function setPosition(value) {
 function start() {
   settings.onChange((now, before) => {
     if (now.stream !== before.stream) return now.stream ? listen() : stop();
-    if (now.stream && now.streamPort !== before.streamPort) listen();
+    if (now.stream && now.streamPort !== before.streamPort) return listen();
+
+    // Внешний вид плашки уезжает в уже открытую страницу — в OBS её
+    // перезагружать не придётся.
+    if (
+      now.streamCover !== before.streamCover ||
+      now.streamLight !== before.streamLight ||
+      now.streamFontSize !== before.streamFontSize
+    ) {
+      push();
+    }
   });
 
   if (settings.get().stream) listen();

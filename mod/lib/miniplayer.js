@@ -54,8 +54,18 @@ function corner() {
 }
 
 const compact = () => Boolean(settings.get().miniplayerCompact);
-const currentWidth = () => (compact() ? COMPACT_WIDTH : WIDTH);
-const currentHeight = () => (compact() ? COMPACT_HEIGHT : HEIGHT);
+
+/** Размер, до которого человек растянул окно, если он ещё годится. */
+function savedSize() {
+  const saved = settings.get().miniplayerSize;
+  if (!settings.get().miniplayerResizable) return null;
+  if (!saved || !Number.isFinite(saved.width) || !Number.isFinite(saved.height)) return null;
+
+  return saved;
+}
+
+const currentWidth = () => savedSize()?.width || (compact() ? COMPACT_WIDTH : WIDTH);
+const currentHeight = () => savedSize()?.height || (compact() ? COMPACT_HEIGHT : HEIGHT);
 
 function create() {
   if (window && !window.isDestroyed()) return window;
@@ -68,10 +78,10 @@ function create() {
     x: position.x,
     y: position.y,
     frame: false,
-    resizable: false,
+    resizable: Boolean(settings.get().miniplayerResizable),
     maximizable: false,
     minimizable: false,
-    skipTaskbar: true,
+    skipTaskbar: !settings.get().miniplayerTaskbar,
     alwaysOnTop: true,
     backgroundColor: '#1a1a1a',
     title: 'KotaMusic',
@@ -99,6 +109,14 @@ function create() {
   };
 
   window.on('moved', remember);
+
+  // Размер запоминаем отдельно: он нужен, только когда окно тянут за край.
+  window.on('resized', () => {
+    if (!alive() || !settings.get().miniplayerResizable) return;
+
+    const [width, height] = window.getSize();
+    settings.set({ miniplayerSize: { width, height } });
+  });
 
   window.on('close', remember);
   window.on('closed', () => {
@@ -258,6 +276,18 @@ function start() {
     if (now.miniplayerHideIdle !== before.miniplayerHideIdle && now.miniplayer) {
       if (now.miniplayerHideIdle && !lastTrack) return hide();
       if (!now.miniplayerHideIdle && !alive()) return show();
+    }
+
+    // Эти свойства задаются при создании окна — пересоздаём его.
+    if (
+      now.miniplayerResizable !== before.miniplayerResizable ||
+      now.miniplayerTaskbar !== before.miniplayerTaskbar
+    ) {
+      if (alive()) {
+        hide();
+        show();
+      }
+      return;
     }
 
     if (now.miniplayerCompact !== before.miniplayerCompact && alive()) {

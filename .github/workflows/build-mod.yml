@@ -36,7 +36,12 @@ jobs:
       - run: npm ci
 
       - name: Собрать
-        run: node scripts/build.js --platform=linux
+        run: node scripts/build.js --platform=linux --keep
+
+      # Проверки идут по собранному клиенту: они смотрят не «врезка
+      # применилась», а что именно получилось в коде.
+      - name: Проверки
+        run: npm test
 
       - id: info
         name: Прочитать версии

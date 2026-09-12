@@ -44,6 +44,41 @@ function applyAutoStart() {
   }
 }
 
+/** Запоминаем размер окна клиента и возвращаем его при запуске. */
+function rememberSize(window) {
+  if (window.__kotamusicSizeHooked) return;
+  window.__kotamusicSizeHooked = true;
+
+  window.on('resized', () => {
+    if (!settings.get().rememberWindowSize || window.isDestroyed()) return;
+
+    const [width, height] = window.getSize();
+    settings.set({ windowSize: { width, height } });
+  });
+}
+
+function restoreSize(window) {
+  const saved = settings.get().windowSize;
+  if (!settings.get().rememberWindowSize) return;
+  if (!saved || !Number.isFinite(saved.width) || !Number.isFinite(saved.height)) return;
+
+  try {
+    window.setSize(Math.max(640, saved.width), Math.max(480, saved.height));
+  } catch (e) {
+    log.warn('Размер окна вернуть не вышло:', e.message);
+  }
+}
+
+/** Страница, с которой клиент открывается. */
+function openStartupPage(window) {
+  const page = String(settings.get().startupPage || '').trim();
+  if (!page || page === '/') return;
+
+  // Тот же канал, которым клиент открывает свои ссылки.
+  window.webContents.send('desktop:navigation:open-deeplink', page);
+  log.info('Стартовая страница:', page);
+}
+
 function startMinimized() {
   if (!settings.get().startMinimized) return;
 
@@ -88,7 +123,18 @@ function start() {
     if (now.autoStart !== before.autoStart) applyAutoStart();
   });
 
-  const init = () => setTimeout(startMinimized, 1000);
+  const init = () =>
+    setTimeout(() => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!isClientWindow(window)) continue;
+
+        rememberSize(window);
+        restoreSize(window);
+        openStartupPage(window);
+      }
+
+      startMinimized();
+    }, 1500);
 
   if (app.isReady()) init();
   else app.once('ready', init);
