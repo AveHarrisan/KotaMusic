@@ -68,9 +68,12 @@ so manual installation only makes sense on Linux.
 <details open>
 <summary>What it shows</summary>
 
-Track title, artists, album and cover art. Elapsed time is shown either as
-a progress bar in the profile card or as a counter — your choice. The title
-and the artist are clickable, and there are two buttons under the status.
+Track title, artists, album and cover art. The title and the artist are
+clickable — they lead to the track and artist pages on the Yandex Music
+site. Elapsed time is shown either as a progress bar in the profile card
+or as a counter, which is also visible in the voice channel card. The
+track title can replace the app name in the member list, and two buttons
+sit under the status.
 
 Works both in the regular player and in "Моя волна" (My Wave).
 
@@ -83,46 +86,91 @@ Works both in the regular player and in "Моя волна" (My Wave).
 
 ![Mini player](../images/miniplayer.png)
 
-A small always-on-top window: cover art, title, seeking by clicking the bar,
-volume behind a button with a percentage readout. Every element can be hidden.
+A small always-on-top window: cover art, scrolling title, artist, time and
+progress bar; play, next, previous, volume with a percentage readout and
+seeking by clicking the bar.
+
+- **Compact mode** — a shorter, narrower window
+- **Hide while nothing plays** — the window disappears instead of showing
+  "nothing is playing" and comes back with the first track
+- **Pinning** — the window becomes semi-transparent and stops catching the
+  mouse; a hotkey unpins it for a set number of seconds
+- **Resizable** with a remembered size and position, optionally shown in
+  the taskbar
+
+</details>
+
+### Now playing overlay for streams
+
+<details open>
+<summary>For OBS and friends</summary>
+
+![Overlay](../images/stream.png)
+
+The mod serves a page at `http://127.0.0.1:8462/` — add it to OBS as a
+Browser source. The address is bound to the local machine only, so the
+overlay is not reachable from the network.
+
+Almost everything is configurable: dark, light or fully transparent
+backdrop, cover art and its size, progress bar, numeric time, custom
+colours for the title, artist and time, text size and a fixed width — the
+overlay never jumps around when a long title arrives, it scrolls instead.
+Changes apply instantly, no need to reload the source in OBS. The settings
+page shows a live preview.
+
+![Overlay settings](../images/settings-stream.png)
+
+</details>
+
+### Window and system
+
+<details open>
+<summary>How the client behaves</summary>
+
+![Window and system](../images/settings-window.png)
+
+- **Close to tray** — the close button hides the window, music keeps playing
+- **Start with the system** and **start minimized**
+- **Remember window size** and **startup page**
+- **Hardware acceleration** — turn it off if the picture flickers
+- **Control this computer from other devices** — your phone or speaker can
+  switch tracks here
 
 </details>
 
 ### Global hotkeys
 
 <details>
-<summary>Defaults and how to change them</summary>
+<summary>What can be bound</summary>
 
 They work over other windows — from a game, a browser, anywhere.
 
-| Action | Default |
-| --- | --- |
-| Play / pause | `Ctrl+Alt+Space` |
-| Next track | `Ctrl+Alt+→` |
-| Previous track | `Ctrl+Alt+←` |
-| Volume up / down | `Ctrl+Alt+↑` / `Ctrl+Alt+↓` |
-| Like | `Ctrl+Alt+L` |
-| Show mini player | not set |
+Play / pause, next and previous track, volume up and down, like, repeat,
+shuffle, show the mini player and unpin it.
 
-Any combination can be changed in the settings: click the field and press
-your own. `Backspace` clears a binding, "Вернуть по умолчанию" restores
-the whole set.
+No combination is bound by default: pick your own so they do not clash with
+other programs. Click the field and press a combination, `Backspace` clears
+it. A combination already taken by another program is highlighted in red.
 
 ![Hotkeys](../images/settings-hotkeys.png)
 
 </details>
 
-### Everything else
+### Player bar and everything else
 
 <details>
 <summary>The list</summary>
 
+- **Always show track time** — normally it appears only on hover
+- **No recolouring from the cover art** — the bar stays dark
+- **Thicker progress bar** — easier to hit when seeking
+- **Static backdrop instead of the My Wave animation** — for weak machines
 - **Taskbar thumbnail buttons on Windows** — control playback without
   restoring the window
-- **Volume percentage** — a short hint next to the slider
+- **Volume percentage** — a short hint next to the slider, with a custom
+  wheel step
 - **Controlling other devices** — run your phone or speaker from the desktop
 - **Interface scale** — from 50 to 200 percent
-- **Custom cache folder** — keep it off the system drive
 - **Keep the screen awake while music plays**
 
 </details>
@@ -131,11 +179,16 @@ the whole set.
 
 ## Settings
 
-Everything is managed inside the client and applied immediately.
+Everything is managed inside the client: **Settings → KotaMusic**. Changes
+apply immediately unless stated otherwise.
 
-![Settings](../images/settings.png)
+There are more than sixty settings, so they are grouped into collapsible
+sections — only the headings with a count are visible at first.
+
+![Settings](../images/settings-sections.png)
 
 ---
+
 
 ## How it works
 
