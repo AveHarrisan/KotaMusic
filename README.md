@@ -46,14 +46,14 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 </td>
 <td align="center" width="120">
 <a href="https://lvl.su/">
-<img src="docs/images/links/lvl.png" width="72" alt="lvl.su"><br>
+<img src="docs/images/links/lvl.png" width="72" height="72" alt="lvl.su"><br>
 <b>lvl.su</b>
 </a><br>
 <sub>гайды и вики</sub>
 </td>
 <td align="center" width="120">
 <a href="https://t.me/kotamarine">
-<img src="https://img.shields.io/badge/TG-%20-229ED9?style=for-the-badge&logo=telegram&logoColor=white" height="72" alt="Котамарин"><br>
+<img src="docs/images/links/kotamarine.png" width="72" height="72" alt="Котамарин"><br>
 <b>Котамарин</b>
 </a><br>
 <sub>канал про игры</sub>
@@ -67,7 +67,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 </td>
 <td align="center" width="120">
 <a href="https://t.me/aveharrisan">
-<img src="https://img.shields.io/badge/TG-%20-229ED9?style=for-the-badge&logo=telegram&logoColor=white" height="72" alt="AveHarrisan"><br>
+<img src="docs/images/links/aveharrisan.png" width="72" height="72" alt="AveHarrisan"><br>
 <b>AveHarrisan</b>
 </a><br>
 <sub>телеграм автора</sub>
