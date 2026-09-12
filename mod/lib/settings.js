@@ -95,8 +95,18 @@ const DEFAULTS = {
 
   // Как выглядит плашка в кадре.
   streamCover: true,
-  streamLight: false,
+  streamCoverSize: 56,
+  streamBar: true,
+  streamTime: false,
   streamFontSize: 16,
+  streamWidth: 560,
+
+  // Подложка: 'dark' — тёмная, 'light' — светлая, 'none' — только текст
+  // с обводкой, без карточки.
+  streamBackground: 'dark',
+
+  // Цвет полосы времени.
+  streamAccent: '#ffdb4d',
 
   // Глобальные горячие клавиши: действие → сочетание. Пустая строка
   // означает, что клавиши у действия нет.
@@ -176,6 +186,14 @@ function load() {
     migrated = true;
   }
 
+  // Раньше светлый вид был отдельным выключателем — стал одним из
+  // вариантов подложки.
+  if (typeof values.streamLight === 'boolean') {
+    values.streamBackground = values.streamLight ? 'light' : 'dark';
+    migrated = true;
+  }
+
+  delete values.streamLight;
   delete values.miniplayerHotkey;
   delete values.useLibrary;
   // Папку кеша клиент задаёт себе сам — настройка ничего не меняла.

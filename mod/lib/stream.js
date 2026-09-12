@@ -24,13 +24,30 @@ const port = () => Math.min(65535, Math.max(1024, Number(settings.get().streamPo
 const address = () => `http://${HOST}:${port()}/`;
 
 /** То, что видит страница: трек, позиция и настройки показа. */
+/** Число из настроек в разумных пределах. */
+const clamp = (value, min, max, fallback) =>
+  Math.min(max, Math.max(min, Number(value) || fallback));
+
 function view() {
-  const size = Math.min(48, Math.max(10, Number(settings.get().streamFontSize) || 16));
+  const config = settings.get();
+
+  // Цвет принимаем только в виде #rgb или #rrggbb: страницу собираем
+  // сами, и чужая строка в стилях нам ни к чему.
+  const accent = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(config.streamAccent || ''))
+    ? config.streamAccent
+    : '#ffdb4d';
 
   return {
-    cover: settings.get().streamCover !== false,
-    light: Boolean(settings.get().streamLight),
-    fontSize: size,
+    cover: config.streamCover !== false,
+    coverSize: clamp(config.streamCoverSize, 32, 160, 56),
+    bar: config.streamBar !== false,
+    time: Boolean(config.streamTime),
+    background: ['dark', 'light', 'none'].includes(config.streamBackground)
+      ? config.streamBackground
+      : 'dark',
+    accent,
+    fontSize: clamp(config.streamFontSize, 10, 48, 16),
+    width: clamp(config.streamWidth, 240, 1920, 560),
   };
 }
 
@@ -83,7 +100,6 @@ function page() {
     align-items: center;
     gap: 14px;
     width: max-content;
-    max-width: 560px;
     padding: 12px 18px 12px 12px;
     border-radius: 14px;
     background: rgba(20, 20, 20, .72);
@@ -97,8 +113,29 @@ function page() {
   .card.light .artist { opacity: .6; }
   .card.light .bar { background: rgba(0, 0, 0, .16); }
 
+  /* Без подложки остаётся только текст: чтобы он читался на любом видео,
+     добавляем обводку и тень. */
+  .card.plain {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .85), 0 0 2px rgba(0, 0, 0, .9);
+  }
+
+  .card.plain .bar { background: rgba(255, 255, 255, .35); }
+
   /* Без обложки плашка становится узкой строкой. */
   .card.nocover img { display: none; }
+  .card.nobar .bar { display: none; }
+
+  .time {
+    margin-top: 6px;
+    font-size: .8em;
+    opacity: .7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card.notime .time { display: none; }
 
   img {
     width: 56px;
@@ -139,7 +176,7 @@ function page() {
   .bar div {
     height: 100%;
     width: 0;
-    background: #ffdb4d;
+    background: var(--accent, #ffdb4d);
     transition: width .4s linear;
   }
 </style>
@@ -150,18 +187,35 @@ function page() {
     <div class="title" id="title"></div>
     <div class="artist" id="artist"></div>
     <div class="bar"><div id="progress"></div></div>
+    <div class="time" id="time"></div>
   </div>
 </div>
 
 <script>
   const el = (id) => document.getElementById(id);
 
+  const clock = (seconds) => {
+    if (!Number.isFinite(seconds)) return '';
+    const total = Math.max(0, Math.round(seconds));
+    return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+  };
+
   function render(data) {
     const view = data.view || {};
+    const card = el('card');
 
     document.body.style.fontSize = (view.fontSize || 16) + 'px';
-    el('card').classList.toggle('light', Boolean(view.light));
-    el('card').classList.toggle('nocover', view.cover === false);
+    card.style.maxWidth = (view.width || 560) + 'px';
+    card.style.setProperty('--accent', view.accent || '#ffdb4d');
+
+    el('cover').style.width = (view.coverSize || 56) + 'px';
+    el('cover').style.height = (view.coverSize || 56) + 'px';
+
+    card.classList.toggle('light', view.background === 'light');
+    card.classList.toggle('plain', view.background === 'none');
+    card.classList.toggle('nocover', view.cover === false);
+    card.classList.toggle('nobar', view.bar === false);
+    card.classList.toggle('notime', !view.time);
 
     // Играть нечего — плашку прячем целиком: пустая карточка в кадре
     // выглядит так, будто трансляция сломалась.
@@ -176,6 +230,10 @@ function page() {
 
     const ratio = data.duration ? Math.min(1, (data.position || 0) / data.duration) : 0;
     el('progress').style.width = (ratio * 100).toFixed(1) + '%';
+
+    el('time').textContent = data.duration
+      ? clock(data.position || 0) + ' / ' + clock(data.duration)
+      : '';
   }
 
   // Обрыв связи — это закрытый клиент: EventSource сам переподключится,
@@ -266,13 +324,18 @@ function start() {
 
     // Внешний вид плашки уезжает в уже открытую страницу — в OBS её
     // перезагружать не придётся.
-    if (
-      now.streamCover !== before.streamCover ||
-      now.streamLight !== before.streamLight ||
-      now.streamFontSize !== before.streamFontSize
-    ) {
-      push();
-    }
+    const looks = [
+      'streamCover',
+      'streamCoverSize',
+      'streamBar',
+      'streamTime',
+      'streamBackground',
+      'streamAccent',
+      'streamFontSize',
+      'streamWidth',
+    ];
+
+    if (looks.some((key) => now[key] !== before[key])) push();
   });
 
   if (settings.get().stream) listen();

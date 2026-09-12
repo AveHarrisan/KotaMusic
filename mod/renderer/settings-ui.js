@@ -231,6 +231,31 @@ function section(title, rows) {
   return wrap;
 }
 
+/** Выбор одного значения из нескольких — вместо выпадающего списка. */
+function choice(options, value, onChange) {
+  const row = el('div', 'display:flex;gap:6px;flex:none');
+
+  for (const [key, label] of options) {
+    const active = key === value;
+
+    const button = el(
+      'button',
+      'padding:8px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;' +
+        'border:1px solid rgba(255,255,255,.15);' +
+        (active
+          ? 'background:var(--ym-controls-color-primary-text-enabled,#ffdb4d);color:#1a1a1a;font-weight:600'
+          : 'background:rgba(255,255,255,.06);color:inherit')
+    );
+
+    button.type = 'button';
+    button.textContent = label;
+    button.addEventListener('click', () => !active && onChange(key));
+    row.appendChild(button);
+  }
+
+  return row;
+}
+
 /** Ссылка наружу: клиент открывает её в браузере. */
 function linkButton(label, url) {
   const node = el(
@@ -435,6 +460,10 @@ function fill(container) {
 
   // --- Трансляция --------------------------------------------------------
 
+  const background = ['dark', 'light', 'none'].includes(config.streamBackground)
+    ? config.streamBackground
+    : 'dark';
+
   add(
     section('Трансляция', [
       row(
@@ -455,15 +484,58 @@ function fill(container) {
         toggle(config.streamCover !== false, (value) => update({ streamCover: value }))
       ),
       row(
-        'Светлый вид',
-        'Для трансляций со светлой картинкой',
-        toggle(config.streamLight, (value) => update({ streamLight: value }))
+        'Размер обложки',
+        'В пикселях, от 32 до 160',
+        textField(String(config.streamCoverSize ?? 56), (value) =>
+          update({ streamCoverSize: Math.min(160, Math.max(32, Number(value) || 56)) })
+        )
+      ),
+      row(
+        'Подложка',
+        background === 'none'
+          ? 'Только текст с обводкой — плашка растворяется в кадре'
+          : background === 'light'
+            ? 'Светлая карточка — для светлого видео'
+            : 'Тёмная карточка — привычный вид',
+        choice(
+          [
+            ['dark', 'Тёмная'],
+            ['light', 'Светлая'],
+            ['none', 'Без неё'],
+          ],
+          background,
+          (value) => update({ streamBackground: value })
+        )
+      ),
+      row(
+        'Полоса времени',
+        'Показывает, сколько трека прошло',
+        toggle(config.streamBar !== false, (value) => update({ streamBar: value }))
+      ),
+      row(
+        'Время числами',
+        'Строка вида «1:23 / 4:21» под полосой',
+        toggle(config.streamTime, (value) => update({ streamTime: value }))
+      ),
+      row(
+        'Цвет полосы',
+        'Шестнадцатеричный цвет, например #ffdb4d',
+        textField(String(config.streamAccent ?? '#ffdb4d'), (value) =>
+          update({ streamAccent: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(value) ? value : '#ffdb4d' })
+        )
       ),
       row(
         'Размер текста',
         'В пикселях, от 10 до 48',
         textField(String(config.streamFontSize ?? 16), (value) =>
           update({ streamFontSize: Math.min(48, Math.max(10, Number(value) || 16)) })
+        )
+      ),
+      row(
+        'Наибольшая ширина',
+        'В пикселях: длинные названия обрезаются многоточием',
+        textField(String(config.streamWidth ?? 560), (value) =>
+          update({ streamWidth: Math.min(1920, Math.max(240, Number(value) || 560)) })
         )
       ),
       row(
