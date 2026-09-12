@@ -85,16 +85,28 @@ function harness({ values = {}, displays } = {}) {
     { workArea: { x: 1920, y: 0, width: 2560, height: 1440 } },
   ];
 
+  const ready = { value: true, waiting: [] };
+
   const electron = {
-    app: { isReady: () => true, once: () => {}, getPath: () => '/tmp' },
+    app: {
+      isReady: () => ready.value,
+      once: (event, fn) => event === 'ready' && ready.waiting.push(fn),
+      getPath: () => '/tmp',
+    },
     BrowserWindow: FakeWindow,
     ipcMain: { on: () => {} },
-    screen: {
-      getAllDisplays: () => all.current || all,
-      getPrimaryDisplay: () => (all.current || all)[0],
-      on: (event, fn) => {
-        state.screenHandlers[event] = fn;
-      },
+    get screen() {
+      // Electron до готовности приложения бросает здесь ошибку — ведём
+      // себя так же, иначе проверка пропустит настоящую поломку.
+      if (!ready.value) throw new Error("The 'screen' module can't be used before the app 'ready' event");
+
+      return {
+        getAllDisplays: () => all.current || all,
+        getPrimaryDisplay: () => (all.current || all)[0],
+        on: (event, fn) => {
+          state.screenHandlers[event] = fn;
+        },
+      };
     },
   };
 
@@ -115,7 +127,14 @@ function harness({ values = {}, displays } = {}) {
   const miniplayer = require(path.join(LIB, 'miniplayer.js'));
   Module._load = original;
 
-  return { miniplayer, state, settings, config: () => config, displays: all };
+  return {
+    miniplayer,
+    state,
+    settings,
+    config: () => config,
+    displays: all,
+    ready,
+  };
 }
 
 test('место окна запоминается, когда его двигает человек', () => {
@@ -175,4 +194,19 @@ test('на место, которого больше нет, окно не во�
   await new Promise((done) => setTimeout(done, 3000));
 
   assert.deepStrictEqual(state.position, [300, 200], 'окно уехало за пределы экрана');
+});
+
+test('до готовности приложения экраны не трогаем', () => {
+  const { miniplayer, state, ready } = harness();
+  ready.value = false;
+
+  // Раньше здесь падал весь мод: всё, что подключается после мини-плеера,
+  // не запускалось вовсе.
+  assert.doesNotThrow(() => miniplayer.start());
+  assert.deepStrictEqual(state.screenHandlers, {}, 'подписались раньше времени');
+
+  ready.value = true;
+  ready.waiting.forEach((fn) => fn());
+
+  assert.ok(state.screenHandlers['display-added'], 'после готовности не подписались');
 });

@@ -22,16 +22,31 @@ try {
   // Аппаратное ускорение выключается только до готовности приложения.
   require('./lib/window').applyHardwareAcceleration();
 
+  // Каждую часть запускаем отдельно: одна упавшая не должна уносить с
+  // собой остальные. Так однажды и вышло — ошибка в мини-плеере оставила
+  // клиент без Discord, плашки и обновлений, а понять это было нельзя.
+  const startPart = (name) => {
+    try {
+      require(`./lib/${name}`).start();
+    } catch (e) {
+      log.error(`Часть мода не запустилась (${name}):`, e);
+    }
+  };
+
   // Папку кеша нужно задать до готовности приложения, поэтому первым.
-  require('./lib/tweaks').start();
-  require('./lib/hotkeys').start();
-  require('./lib/taskbar').start();
-  require('./lib/miniplayer').start();
-  require('./lib/rich-presence').start();
-  require('./lib/stream').start();
-  require('./lib/window').start();
-  require('./lib/restart').start();
-  require('./lib/updates').start();
+  for (const name of [
+    'tweaks',
+    'hotkeys',
+    'taskbar',
+    'miniplayer',
+    'rich-presence',
+    'stream',
+    'window',
+    'restart',
+    'updates',
+  ]) {
+    startPart(name);
+  }
 
   // Открыть страницу настроек сразу после запуска — удобно для снимков
   // экрана и проверок. В обычной работе переменная не задана.

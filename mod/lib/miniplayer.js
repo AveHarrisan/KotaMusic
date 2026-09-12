@@ -216,8 +216,13 @@ function restorePosition() {
 /**
  * Следим за экранами: их выключение и включение переставляет окна, и
  * своё мы ставим назад сами — система об этом не позаботится.
+ *
+ * Подписываться можно только после готовности приложения: до неё модуль
+ * экранов в Electron недоступен и бросает ошибку.
  */
 function watchDisplays() {
+  if (!app.isReady()) return app.once('ready', watchDisplays);
+
   const changed = () => {
     displaysChangedAt = Date.now();
 
