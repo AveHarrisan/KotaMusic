@@ -109,6 +109,26 @@ test('список изменений разбирается по версиям
   );
 });
 
+test('наружу открываются только безопасные ссылки', () => {
+  const code = fs.readFileSync(path.join(ROOT, 'mod/lib/updates.js'), 'utf8');
+  const line = code.match(/const allowed =[\s\S]{0,320}?;/);
+
+  assert.ok(line, 'в моде больше нет проверки открываемых ссылок');
+
+  const allowed = new Function('url', `${line[0]} return allowed;`);
+
+  // Плашка для трансляции живёт на своём же компьютере по http.
+  assert.ok(allowed('http://127.0.0.1:8462/'));
+  assert.ok(allowed('http://localhost:8462/'));
+  assert.ok(allowed('https://lvl.su/'));
+
+  // Чужое по http не открываем, и похожий на свой адрес — тоже.
+  assert.ok(!allowed('http://example.com/'));
+  assert.ok(!allowed('http://127.0.0.1.evil.com/'));
+  assert.ok(!allowed('file:///etc/passwd'));
+  assert.ok(!allowed(null));
+});
+
 test('все настройки мода видны в окне настроек', () => {
   const defaults = fs.readFileSync(path.join(ROOT, 'mod/lib/settings.js'), 'utf8');
   const ui = fs.readFileSync(path.join(ROOT, 'mod/renderer/settings-ui.js'), 'utf8');

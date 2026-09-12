@@ -320,7 +320,15 @@ function start() {
   }
 
   ipcMain.on('kotamusic:open-url', (_event, url) => {
-    if (typeof url === 'string' && /^https:\/\//.test(url)) shell.openExternal(url);
+    // Наружу пускаем только https, но плашка для трансляции живёт на
+    // своём же компьютере по http — её адрес разрешаем отдельно.
+    const allowed =
+      typeof url === 'string' &&
+      (/^https:\/\//.test(url) || /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(url));
+
+    if (!allowed) return log.warn('Ссылку открывать не стал:', url);
+
+    shell.openExternal(url);
   });
 
   // Кнопка «Обновить» в сообщении: качаем архив, подменяем его и
