@@ -42,7 +42,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 <img src="https://img.shields.io/badge/DA-%20-F57D07?style=for-the-badge&logo=donationalerts&logoColor=white" height="72" alt="DonationAlerts"><br>
 <b>DonationAlerts</b>
 </a><br>
-<sub>разовый донат</sub>
+<sub>разовый донат<br>без подписки</sub>
 </td>
 <td align="center" width="120">
 <a href="https://lvl.su/">
@@ -56,7 +56,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 <img src="docs/images/links/kotamarine.png" width="72" height="72" alt="Котамарин"><br>
 <b>Котамарин</b>
 </a><br>
-<sub>канал про игры</sub>
+<sub>канал про игры<br>и раздачи</sub>
 </td>
 <td align="center" width="120">
 <a href="https://discord.com/invite/XYBvdvfv8t">
@@ -70,7 +70,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 <img src="docs/images/links/aveharrisan.png" width="72" height="72" alt="AveHarrisan"><br>
 <b>AveHarrisan</b>
 </a><br>
-<sub>телеграм автора</sub>
+<sub>личный телеграм<br>автора</sub>
 </td>
 </tr>
 </table>
