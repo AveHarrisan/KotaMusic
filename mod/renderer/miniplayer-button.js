@@ -27,6 +27,10 @@ const LOCK_ICON = (closed) =>
 // Отступ от плашки версии.
 const GAP = 8;
 
+// Насколько близко к правому нижнему углу должна лежать плашка версии,
+// чтобы считаться той самой.
+const CORNER_ZONE = 260;
+
 /**
  * Плашка версии не просто есть в разметке, а действительно видна: над ней
  * нет заставки клиента. Разметку клиент собирает заранее, а рисует окно
@@ -72,6 +76,8 @@ let locked = false;
  * предка, который и есть видимая плашка.
  */
 function versionBadge() {
+  const candidates = [];
+
   for (const node of document.body.querySelectorAll('div, span, p')) {
     if (node.children.length) continue;
     if (!VERSION.test(node.textContent.trim())) continue;
@@ -89,10 +95,30 @@ function versionBadge() {
       if (background && background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') break;
     }
 
-    return badge;
+    candidates.push(badge);
   }
 
-  return null;
+  // Номер версии встречается не только в углу: на странице настроек он
+  // стоит строкой посреди списка, и кнопка уезжала туда же. Берём только
+  // тот, что и правда лежит в правом нижнем углу окна.
+  const corner = candidates.filter((badge) => {
+    const rect = badge.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+
+    return (
+      rect.bottom > window.innerHeight - CORNER_ZONE &&
+      rect.right > window.innerWidth - CORNER_ZONE
+    );
+  });
+
+  if (!corner.length) return null;
+
+  // Если их вдруг несколько — самый нижний и самый правый.
+  return corner.sort(
+    (a, b) =>
+      b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom ||
+      b.getBoundingClientRect().right - a.getBoundingClientRect().right
+  )[0];
 }
 
 /**

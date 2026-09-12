@@ -734,6 +734,33 @@ function render() {
   anchor.parentElement.insertBefore(item, anchor.nextSibling);
 }
 
+// Пришли из сообщения мода: раскрываем названный раздел и показываем его.
+ipcRenderer.on('kotamusic:settings:section', (_event, section) => {
+  if (!section) return;
+
+  openSections[section] = true;
+  rememberOpen();
+
+  // Настройки могут ещё открываться — ищем раздел, пока он не появится.
+  let tries = 0;
+
+  const timer = setInterval(() => {
+    render();
+
+    const heading = [...document.querySelectorAll(`[data-${MARK}] button`)].find(
+      (node) => node.textContent.startsWith(section)
+    );
+
+    if (heading) {
+      heading.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      clearInterval(timer);
+      return;
+    }
+
+    if ((tries += 1) > 20) clearInterval(timer);
+  }, 500);
+});
+
 async function start() {
   const state = await ipcRenderer.invoke('kotamusic:settings:get');
   config = state.values;

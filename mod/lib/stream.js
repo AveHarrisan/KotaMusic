@@ -275,23 +275,6 @@ function handle(request, response) {
   response.end();
 }
 
-/** Сообщение в окне клиента: журнал человек не читает. */
-function notify(text) {
-  const { BrowserWindow } = require('electron');
-
-  let sent = 0;
-
-  for (const window of BrowserWindow.getAllWindows()) {
-    // Своё окно мини-плеера пропускаем: сообщение там ни к чему.
-    if (window.isDestroyed() || window.getTitle?.() === 'KotaMusic') continue;
-
-    window.webContents.send('kotamusic:notice', { text, kind: 'error' });
-    sent += 1;
-  }
-
-  log.info(`Сообщение в окно клиента (${sent}):`, text);
-}
-
 function stop() {
   for (const response of listeners) {
     try {
@@ -320,11 +303,13 @@ function listen() {
     settings.set({ stream: false });
 
     // Тумблер гаснет сам — человек должен понимать, почему.
-    notify(
+    // Окна клиента в этот миг может ещё не быть: сообщение подождёт его.
+    require('./notice').show(
       e.code === 'EADDRINUSE'
         ? `Плашка для трансляции не включилась: порт ${port()} занят другой программой. ` +
-            'Выберите в настройках другой порт.'
-        : `Плашка для трансляции не включилась: ${e.message}`
+            'Нажмите, чтобы выбрать другой.'
+        : `Плашка для трансляции не включилась: ${e.message}`,
+      { section: 'Трансляция' }
     );
   });
 

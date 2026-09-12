@@ -9,6 +9,13 @@ const { ipcRenderer } = require('electron');
 
 const MARK = 'data-kotamusic-notice';
 
+// Спрашиваем, не ждёт ли нас сообщение: мод мог родить его до того,
+// как страница появилась на свет.
+const ask = () => ipcRenderer.send('kotamusic:notice:pull');
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ask);
+else ask();
+
 ipcRenderer.on('kotamusic:notice', (_event, notice) => {
   if (!notice?.text) return;
 
@@ -38,9 +45,25 @@ ipcRenderer.on('kotamusic:notice', (_event, notice) => {
     setTimeout(() => box.remove(), 300);
   };
 
-  box.addEventListener('click', hide);
+  // Щелчок ведёт туда, где это чинится, а не просто прячет сообщение.
+  if (notice.section) {
+    box.style.cursor = 'pointer';
+
+    const hint = document.createElement('div');
+    hint.style.cssText = 'margin-top:6px;opacity:.55;font-size:12px';
+    hint.textContent = `Открыть настройки → ${notice.section}`;
+    box.appendChild(hint);
+  }
+
+  box.addEventListener('click', () => {
+    if (notice.section) ipcRenderer.send('kotamusic:notice:action', notice.section);
+    hide();
+  });
   document.body.appendChild(box);
   requestAnimationFrame(() => (box.style.opacity = '1'));
+
+  // Подтверждаем показ: иначе непонятно, дошло ли сообщение до глаз.
+  ipcRenderer.send('kotamusic:notice:shown', notice.text);
 
   // Сообщение о неполадке висит дольше: его надо успеть прочитать.
   setTimeout(hide, notice.kind === 'error' ? 20000 : 8000);
