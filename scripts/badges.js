@@ -14,13 +14,16 @@ const REPO = 'AveHarrisan/KotaMusic';
 const API = `https://api.github.com/repos/${REPO}/releases`;
 const OUT = path.join(__dirname, '..', 'docs', 'badges');
 
-// Мод и установщики под три системы. Всё остальное — служебное.
-const COUNTED = new Set([
-  'app.asar',
-  'KotaMusic-Setup.exe',
-  'KotaMusic.AppImage',
-  'KotaMusic.dmg',
-]);
+// Считаем только сам мод. Установщик скачивают один раз, а дальше мод
+// обновляет себя сам — по числу загрузок архива и видно, сколько людей
+// им пользуются.
+const COUNTED = new Set(['app.asar']);
+
+// ⚠️Счётчик GitHub живёт у файла, а не у релиза: при выпуске новой версии
+// мода файл в релизе заменяется, и его счётчик начинается с нуля. Поэтому
+// храним прошлые числа рядом и переносим их в «накопленное», когда счётчик
+// у файла падает.
+const STATE = 'downloads-state.json';
 
 /** Формат значка-«конечной точки» shields. */
 const badge = (label, message, color) => ({
@@ -57,20 +60,56 @@ async function modVersion(list) {
   }
 }
 
-async function main() {
-  const list = await releases();
+/** Прошлые числа: что мы видели в предыдущий раз. */
+async function readState() {
+  try {
+    return JSON.parse(await fs.readFile(path.join(OUT, STATE), 'utf8'));
+  } catch {
+    return { carried: 0, assets: {} };
+  }
+}
 
-  let downloads = 0;
+/**
+ * Складывает загрузки с оглядкой на прошлый раз. Возвращает новое
+ * состояние и общее число — оно только растёт.
+ */
+function combine(previous, list) {
+  const state = { carried: previous.carried || 0, assets: {} };
   const seen = [];
 
   for (const release of list) {
     for (const asset of release.assets || []) {
       if (!COUNTED.has(asset.name)) continue;
 
-      downloads += asset.download_count;
-      seen.push(`${asset.name}: ${asset.download_count}`);
+      const key = `${release.tag_name}/${asset.name}`;
+      const before = previous.assets?.[key] || 0;
+
+      // Файл заменили новой сборкой — прошлые загрузки уже не вернуть,
+      // поэтому уносим их в накопленное, чтобы общее число не падало.
+      if (asset.download_count < before) {
+        state.carried += before;
+        seen.push(`${key}: ${before} перенесено`);
+      }
+
+      state.assets[key] = asset.download_count;
+      seen.push(`${key}: ${asset.download_count}`);
     }
   }
+
+  // Релиз могли удалить — его загрузки тоже сохраняем.
+  for (const [key, value] of Object.entries(previous.assets || {})) {
+    if (!(key in state.assets)) state.carried += value;
+  }
+
+  const downloads =
+    state.carried + Object.values(state.assets).reduce((sum, value) => sum + value, 0);
+
+  return { state, downloads, seen };
+}
+
+async function main() {
+  const list = await releases();
+  const { state, downloads, seen } = combine(await readState(), list);
 
   const version = await modVersion(list);
 
@@ -82,15 +121,24 @@ async function main() {
   );
 
   await fs.writeFile(
+    path.join(OUT, STATE),
+    JSON.stringify(state, null, 2) + '\n'
+  );
+
+  await fs.writeFile(
     path.join(OUT, 'mod.json'),
     JSON.stringify(badge('Версия мода', version || '—', 'blue'), null, 2) + '\n'
   );
 
-  console.log('Загрузок:', downloads, `(${seen.join(', ')})`);
+  console.log('Загрузок:', downloads, `(накоплено ${state.carried}; ${seen.join(', ')})`);
   console.log('Версия мода:', version || 'неизвестна');
 }
 
-main().catch((e) => {
-  console.error('Значки не обновились:', e.message);
-  process.exit(1);
-});
+module.exports = { combine, COUNTED };
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('Значки не обновились:', e.message);
+    process.exit(1);
+  });
+}

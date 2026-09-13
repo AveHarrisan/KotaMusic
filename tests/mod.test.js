@@ -137,16 +137,53 @@ test('значок загрузок считает только то, что к�
 
   const counted = new Set([...list[0].matchAll(/'([^']+)'/g)].map((m) => m[1]));
 
-  // Эти файлы человек скачивает сам.
-  for (const name of ['app.asar', 'KotaMusic-Setup.exe', 'KotaMusic.AppImage', 'KotaMusic.dmg']) {
-    assert.ok(counted.has(name), `${name} перестал считаться`);
-  }
+  // Считаем сам мод: установщик скачивают один раз, дальше мод обновляет
+  // себя сам, и именно архив показывает, сколько людей им пользуются.
+  assert.ok(counted.has('app.asar'), 'app.asar перестал считаться');
 
   // А эти качают сами мод и установщик при проверке обновлений — из-за
   // них число загрузок росло само по себе.
   for (const name of ['build-info.json', 'installer-info.json']) {
     assert.ok(!counted.has(name), `${name} снова попал в счёт`);
   }
+});
+
+test('загрузки не обнуляются при выпуске новой версии мода', () => {
+  const { combine } = require(path.join(ROOT, 'scripts', 'badges.js'));
+
+  const release = (count) => [
+    { tag_name: 'mod-5.119.0', assets: [{ name: 'app.asar', download_count: count }] },
+  ];
+
+  // Люди скачали мод пять раз.
+  let { state, downloads } = combine({ carried: 0, assets: {} }, release(5));
+  assert.strictEqual(downloads, 5);
+
+  // Вышла новая версия: файл в релизе заменён, счётчик у него с нуля.
+  ({ state, downloads } = combine(state, release(0)));
+  assert.strictEqual(downloads, 5, 'прошлые загрузки потерялись');
+
+  // Скачали ещё дважды — счёт продолжается, а не начинается заново.
+  ({ state, downloads } = combine(state, release(2)));
+  assert.strictEqual(downloads, 7);
+
+  // Клиент обновился, появился новый релиз — считаем оба.
+  ({ downloads } = combine(state, [
+    ...release(2),
+    { tag_name: 'mod-5.120.0', assets: [{ name: 'app.asar', download_count: 3 }] },
+  ]));
+  assert.strictEqual(downloads, 10);
+});
+
+test('удалённый релиз не уносит загрузки с собой', () => {
+  const { combine } = require(path.join(ROOT, 'scripts', 'badges.js'));
+
+  const first = combine({ carried: 0, assets: {} }, [
+    { tag_name: 'mod-5.119.0', assets: [{ name: 'app.asar', download_count: 4 }] },
+  ]);
+
+  const second = combine(first.state, []);
+  assert.strictEqual(second.downloads, 4);
 });
 
 test('значки в описании берутся из наших же чисел', () => {
