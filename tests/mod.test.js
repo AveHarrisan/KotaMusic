@@ -129,6 +129,36 @@ test('наружу открываются только безопасные сс
   assert.ok(!allowed(null));
 });
 
+test('значок загрузок считает только то, что качают люди', () => {
+  const code = fs.readFileSync(path.join(ROOT, 'scripts/badges.js'), 'utf8');
+  const list = code.match(/const COUNTED = new Set\(\[[\s\S]*?\]\);/);
+
+  assert.ok(list, 'в значках больше нет списка учитываемых файлов');
+
+  const counted = new Set([...list[0].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+
+  // Эти файлы человек скачивает сам.
+  for (const name of ['app.asar', 'KotaMusic-Setup.exe', 'KotaMusic.AppImage', 'KotaMusic.dmg']) {
+    assert.ok(counted.has(name), `${name} перестал считаться`);
+  }
+
+  // А эти качают сами мод и установщик при проверке обновлений — из-за
+  // них число загрузок росло само по себе.
+  for (const name of ['build-info.json', 'installer-info.json']) {
+    assert.ok(!counted.has(name), `${name} снова попал в счёт`);
+  }
+});
+
+test('значки в описании берутся из наших же чисел', () => {
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+
+  assert.ok(
+    !/img\.shields\.io\/github\/downloads/.test(readme),
+    'вернулся готовый значок shields, считающий служебные файлы'
+  );
+  assert.match(readme, /img\.shields\.io\/endpoint\?url=[^)]*badges\/downloads\.json/);
+});
+
 test('все настройки мода видны в окне настроек', () => {
   const defaults = fs.readFileSync(path.join(ROOT, 'mod/lib/settings.js'), 'utf8');
   const ui = fs.readFileSync(path.join(ROOT, 'mod/renderer/settings-ui.js'), 'utf8');

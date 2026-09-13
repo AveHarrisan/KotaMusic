@@ -20,8 +20,8 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 [![Linux](https://img.shields.io/badge/Скачать_для-Linux-F1502F?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.AppImage)
 [![macOS](https://img.shields.io/badge/Скачать_для-macOS_(без_проверки)-777777?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/AveHarrisan/KotaMusic/releases/download/installer/KotaMusic.dmg)
 
-[![Загрузок](https://img.shields.io/github/downloads/AveHarrisan/KotaMusic/total?label=Загрузок&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
-[![Последняя сборка](https://img.shields.io/github/v/release/AveHarrisan/KotaMusic?label=Сборка_мода&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
+[![Загрузок](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AveHarrisan/KotaMusic/main/docs/badges/downloads.json&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
+[![Версия мода](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AveHarrisan/KotaMusic/main/docs/badges/mod.json&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
 [![Все файлы](https://img.shields.io/badge/Все_файлы-релизы-lightgrey?style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
 
 ### Поддержать и найти меня

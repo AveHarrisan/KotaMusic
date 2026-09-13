@@ -108,6 +108,24 @@ jobs:
           name: app-asar-${{ steps.info.outputs.client }}
           path: dist/
 
+      # Значки описания считаем сами: готовый значок shields складывает
+      # загрузки всех файлов релиза, включая служебные, которые мод и
+      # установщик качают сами.
+      - name: Обновить значки
+        run: |
+          node scripts/badges.js
+
+          if git diff --quiet -- docs/badges; then
+            echo "значки не изменились"
+            exit 0
+          fi
+
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add docs/badges
+          git commit -m "Значки: свежие числа загрузок и версии"
+          git push
+
       - name: Выложить релиз
         if: steps.check.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2

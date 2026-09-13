@@ -13,8 +13,8 @@ the stock client is missing.
 [![Русский](https://img.shields.io/badge/Язык-Русский-lightgrey?style=flat-square)](../../README.md)
 [![English](https://img.shields.io/badge/Language-English-blue?style=flat-square)](README.md)
 
-[![Downloads](https://img.shields.io/github/downloads/AveHarrisan/KotaMusic/total?label=Downloads&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
-[![Latest build](https://img.shields.io/github/v/release/AveHarrisan/KotaMusic?label=Build&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
+[![Downloads](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AveHarrisan/KotaMusic/main/docs/badges/downloads.json&label=Downloads&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases)
+[![Mod version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AveHarrisan/KotaMusic/main/docs/badges/mod.json&label=Mod%20version&style=flat-square)](https://github.com/AveHarrisan/KotaMusic/releases/latest)
 ![Windows](https://img.shields.io/badge/Windows-supported-blue?style=flat-square)
 ![Linux](https://img.shields.io/badge/Linux-supported-blue?style=flat-square)
 ![macOS](https://img.shields.io/badge/macOS-in_progress-lightgrey?style=flat-square)
