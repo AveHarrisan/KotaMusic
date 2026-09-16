@@ -377,10 +377,10 @@ function start() {
   ipcMain.on(TRACK_CHANNEL, (_event, reported) => {
     const title = track?.title;
     panelTrack = reported;
-    if (reported?.title !== title) {
-      stalled = false;
-      stillSince = null;
-    }
+    // Время, простоявшее до этого события (например, на честной паузе),
+    // к зависанию не относится — отсчёт начинаем заново.
+    stillSince = null;
+    if (reported?.title !== title || !reported?.isPlaying) stalled = false;
     applyTrack(stalled && reported ? { ...reported, isPlaying: false } : reported);
   });
 

@@ -136,12 +136,15 @@ function imageFrom(node) {
   return src.replace(/\/(?:\d+x\d+|orig)$/, '/400x400');
 }
 
+// Исполнители последнего трека, прочитанные по ссылкам, — на паузе ссылок нет.
+let known = { title: null, artists: [] };
+
 function readState() {
   const bar = pick(document, ID.bar);
   if (!bar) return null;
 
   const titleEl = pick(bar, ID.title);
-  const title = cleanText(titleEl);
+  let title = cleanText(titleEl);
   if (!title) return null;
 
   // В режиме «Моей волны» исполнители и кнопка паузы живут вне панели.
@@ -153,6 +156,22 @@ function readState() {
   const artistLinks = pickAll(bar, ID.artist).length
     ? pickAll(bar, ID.artist)
     : pickAll(document, ID.artist);
+  let artists = artistLinks.map(cleanText).filter(Boolean);
+
+  // В «Моей волне» название то и дело читается склейкой
+  // «Исполнитель —Название», а на паузе ссылки на исполнителей пропадают
+  // совсем и остаётся одна склейка. Раньше такие чтения отбрасывались,
+  // и пауза до Discord не доходила вовсе.
+  const cut = title.indexOf(' —');
+  if (cut > 0 && cut + 2 < title.length) {
+    const head = title.slice(0, cut).trim();
+    const rest = title.slice(cut + 2).trim();
+    if (artists.length ? head === artists.join(', ') : true) {
+      title = rest;
+      if (!artists.length) artists = known.title === rest ? known.artists : [head];
+    }
+  }
+  if (artists.length && artistLinks.length) known = { title, artists };
 
   // Обложку ищем только внутри панели: по всей странице попадётся
   // картинка первой попавшейся карточки, и она не будет меняться.
@@ -177,7 +196,7 @@ function readState() {
 
   return {
     title,
-    artists: artistLinks.map(cleanText).filter(Boolean),
+    artists,
     trackUrl: absolute(titleEl?.getAttribute('href') || albumLink?.getAttribute('href')),
     artistUrl: absolute(artistLinks[0]?.getAttribute('href')),
     cover: coverUrl,
