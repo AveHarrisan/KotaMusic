@@ -20,6 +20,7 @@ const TIME_REFRESH_MS = 10000; // как часто переписываем в�
 const MIN_INTERVAL_MS = 2000; // Discord ограничивает частоту обновлений
 const SEEK_TOLERANCE_S = 3; // расхождение, после которого считаем это перемоткой
 const CLEAR_GRACE_MS = 6000; // на стыке треков плеер на миг «не играет»
+const PAUSE_CONFIRM_MS = 1500; // на стыке треков плеер на миг «на паузе»
 const STALL_MS = 15000; // столько время трека стоит на месте — значит, пауза
 const WEB_BASE = 'https://music.yandex.ru';
 
@@ -34,6 +35,8 @@ let clearTimer = null;
 // тогда статус висел всю ночь. Время трека не врёт: если оно не движется,
 // считаем, что пауза, что бы ни показывала кнопка.
 let stalled = false;
+let pausedAt = null; // когда музыка встала на паузу
+let pauseTimer = null;
 let stillSince = null; // с какого момента позиция не меняется
 
 let track = null;
@@ -77,10 +80,38 @@ function label(text) {
   return cut;
 }
 
+function pauseLimitMs() {
+  const minutes = Number(settings.get().pauseClearMinutes);
+  return Number.isFinite(minutes) && minutes >= 0 ? minutes * 60000 : 15 * 60000;
+}
+
+/** Пересобрать статус, когда пауза подтвердится и когда истечёт срок. */
+function watchPause() {
+  clearTimeout(pauseTimer);
+  pauseTimer = null;
+  if (pausedAt === null) return;
+
+  const age = Date.now() - pausedAt;
+  const next = age < PAUSE_CONFIRM_MS ? PAUSE_CONFIRM_MS : pauseLimitMs();
+  if (age >= next) return;
+
+  pauseTimer = setTimeout(() => {
+    lastSent = '';
+    sync();
+    watchPause();
+  }, next - age);
+}
+
 /** Состояние плеера → активность в Discord. */
 function buildActivity() {
   if (!settings.get().richPresence) return null;
-  if (!track || !track.isPlaying) return null;
+  if (!track) return null;
+
+  // На паузе статус не снимаем сразу: убираем время и пишем «на паузе»,
+  // а целиком снимаем, только если пауза затянулась.
+  const pausedFor = track.isPlaying || pausedAt === null ? 0 : Date.now() - pausedAt;
+  const paused = pausedFor >= PAUSE_CONFIRM_MS;
+  if (paused && pausedFor >= pauseLimitMs()) return null;
 
   const artists = track.artists?.length ? track.artists.join(', ') : 'Неизвестный исполнитель';
 
@@ -109,7 +140,9 @@ function buildActivity() {
   // В компактной карточке канала Discord время не показывает вовсе:
   // полосу он рисует только в профиле. Поэтому по желанию дописываем
   // секунды прямо в строку исполнителя — её видно при наведении.
-  if (settings.get().timeInState && Number.isFinite(position)) {
+  if (paused) {
+    activity.state = `${artists} · на паузе`.slice(0, 128);
+  } else if (settings.get().timeInState && Number.isFinite(position)) {
     const suffix = Number.isFinite(duration) && duration > 0
       ? ` · ${clock(position)} / ${clock(duration)}`
       : ` · ${clock(position)}`;
@@ -117,7 +150,7 @@ function buildActivity() {
     activity.state = (artists + suffix).slice(0, 128);
   }
 
-  if (Number.isFinite(position)) {
+  if (!paused && Number.isFinite(position)) {
     const now = Date.now();
     const start = Math.round(now - position * 1000);
 
@@ -167,6 +200,17 @@ function sync() {
   // сразу нельзя — он будет мигать на каждом переходе. Ждём выдержку
   // и снимаем, только если музыка так и не возобновилась.
   if (!activity) {
+    // Истёкшая пауза уже выдержана — снимаем без второго ожидания.
+    const pauseExpired = track && pausedAt !== null && Date.now() - pausedAt >= PAUSE_CONFIRM_MS;
+    if (pauseExpired && rpc.connected && lastSent !== 'null') {
+      clearTimeout(clearTimer);
+      clearTimer = null;
+      lastSent = 'null';
+      lastSentAt = Date.now();
+      rpc.clearActivity();
+      log.info('Статус снят: пауза затянулась');
+      return;
+    }
     if (clearTimer) return;
     clearTimer = setTimeout(() => {
       clearTimer = null;
@@ -388,6 +432,13 @@ function start() {
     const before = track;
     track = state;
 
+    if (!state?.isPlaying) {
+      if (pausedAt === null || before?.isPlaying || before?.title !== state?.title) pausedAt = Date.now();
+    } else {
+      pausedAt = null;
+    }
+    watchPause();
+
     const changed =
       before?.title !== state?.title ||
       before?.isPlaying !== state?.isPlaying ||
@@ -463,6 +514,7 @@ function start() {
     }
 
     lastSent = ''; // содержимое статуса могло измениться при тех же данных
+    watchPause();
     scheduleSync();
   });
 

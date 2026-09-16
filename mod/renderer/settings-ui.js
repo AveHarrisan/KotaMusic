@@ -496,6 +496,15 @@ function fill(container) {
         toggle(config.showButtons, (value) => update({ showButtons: value }))
       ),
       row(
+        'Снимать статус на паузе',
+        'Пока пауза короче этого срока, в статусе написано «на паузе»',
+        choice(
+          [[0, 'Сразу'], [1, '1 мин'], [5, '5 мин'], [15, '15 мин'], [60, '1 час']],
+          config.pauseClearMinutes,
+          (value) => update({ pauseClearMinutes: value })
+        )
+      ),
+      row(
         'Показывать альбом',
         'Третьей строкой статуса вместо надписи «Яндекс Музыка»',
         toggle(config.showAlbum, (value) => update({ showAlbum: value }))
