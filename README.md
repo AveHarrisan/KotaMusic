@@ -170,7 +170,7 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 <p>
 <img src="docs/images/discord-profile.png" height="360" alt="Статус в профиле Discord">
 &nbsp;
-<img src="docs/images/discord-voice.png" height="160" alt="Статус с кнопками при наведении">
+<img src="docs/images/discord-voice.png" height="180" alt="Статус с кнопками при наведении">
 </p>
 
 </details>

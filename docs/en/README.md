@@ -81,7 +81,7 @@ after a couple of seconds, and it stays in place when the track changes.
 <p>
 <img src="../images/discord-profile.png" height="360" alt="Status in the Discord profile">
 &nbsp;
-<img src="../images/discord-voice.png" height="160" alt="Status with buttons on hover">
+<img src="../images/discord-voice.png" height="180" alt="Status with buttons on hover">
 </p>
 
 </details>
