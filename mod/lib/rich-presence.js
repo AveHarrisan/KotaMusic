@@ -330,6 +330,19 @@ function start() {
       return;
     }
 
+    // Ежесекундное чтение видит паузу надёжнее, чем рассылка состояния:
+    // та иногда так и не сообщает о ней, а мини-плеер, живущий на этих
+    // же чтениях, показывает паузу верно. Верим двум чтениям подряд.
+    if (
+      typeof data.isPlaying === 'boolean' &&
+      data.isPlaying === previous.isPlaying &&
+      panelTrack?.title === data.title &&
+      panelTrack.isPlaying !== data.isPlaying
+    ) {
+      panelTrack = { ...panelTrack, isPlaying: data.isPlaying };
+      applyTrack(stalled ? { ...panelTrack, isPlaying: false } : panelTrack);
+    }
+
     if (data.position === previous.position) {
       stillSince ??= previous.at;
       if (!stalled && panelTrack?.isPlaying && tickState.at - stillSince >= STALL_MS) {
