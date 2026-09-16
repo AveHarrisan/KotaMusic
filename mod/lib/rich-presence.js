@@ -20,6 +20,7 @@ const TIME_REFRESH_MS = 10000; // как часто переписываем в�
 const MIN_INTERVAL_MS = 2000; // Discord ограничивает частоту обновлений
 const SEEK_TOLERANCE_S = 3; // расхождение, после которого считаем это перемоткой
 const CLEAR_GRACE_MS = 6000; // на стыке треков плеер на миг «не играет»
+const STALL_MS = 15000; // столько время трека стоит на месте — значит, пауза
 const WEB_BASE = 'https://music.yandex.ru';
 
 let rpc = null;
@@ -29,8 +30,14 @@ let lastSentAt = 0;
 let tickState = null; // свежая позиция: { title, position, duration, at }
 let albumTitle = null;
 let clearTimer = null;
+// Кнопка у панели иногда так и остаётся «Паузой», хотя музыка стоит, —
+// тогда статус висел всю ночь. Время трека не врёт: если оно не движется,
+// считаем, что пауза, что бы ни показывала кнопка.
+let stalled = false;
+let stillSince = null; // с какого момента позиция не меняется
 
 let track = null;
+let panelTrack = null; // как состояние видит панель, без поправки на паузу
 let lastSent = '';
 // Часть полей поддерживают не все версии Discord: если он ругается,
 // переходим на упрощённый вид и больше не пробуем.
@@ -318,7 +325,33 @@ function start() {
     miniplayer.setPosition(data);
     stream.setPosition(data);
 
-    if (previous?.title !== data.title) return;
+    if (previous?.title !== data.title) {
+      stillSince = null;
+      return;
+    }
+
+    if (data.position === previous.position) {
+      stillSince ??= previous.at;
+      if (!stalled && panelTrack?.isPlaying && tickState.at - stillSince >= STALL_MS) {
+        stalled = true;
+        log.info(`Время трека стоит на ${Math.round(data.position)} с — считаю, что пауза`);
+        applyTrack({ ...panelTrack, isPlaying: false });
+      }
+      return; // стоящее время — не перемотка
+    }
+
+    stillSince = null;
+    // Перемотка на паузе тоже двигает позицию, но музыку не включает:
+    // верим только ходу вперёд не быстрее реального времени.
+    const step = data.position - previous.position;
+    const flowing = step > 0 && step <= (tickState.at - previous.at) / 1000 + SEEK_TOLERANCE_S;
+    if (stalled && flowing) {
+      stalled = false;
+      log.info('Время трека пошло — музыка снова играет');
+      if (panelTrack) applyTrack(panelTrack);
+    }
+
+    if (stalled) return; // перемотка на паузе статус не меняет
 
     const expected = previous.position + (tickState.at - previous.at) / 1000;
     if (Math.abs(data.position - expected) > SEEK_TOLERANCE_S) {
@@ -328,7 +361,17 @@ function start() {
     }
   });
 
-  ipcMain.on(TRACK_CHANNEL, (_event, state) => {
+  ipcMain.on(TRACK_CHANNEL, (_event, reported) => {
+    const title = track?.title;
+    panelTrack = reported;
+    if (reported?.title !== title) {
+      stalled = false;
+      stillSince = null;
+    }
+    applyTrack(stalled && reported ? { ...reported, isPlaying: false } : reported);
+  });
+
+  function applyTrack(state) {
     const before = track;
     track = state;
 
@@ -373,7 +416,7 @@ function start() {
       );
       scheduleSync();
     }
-  });
+  }
 
   // При выходе статус надо снять, иначе он висит после закрытия клиента.
   const shutdown = () => {
