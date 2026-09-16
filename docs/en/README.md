@@ -75,7 +75,14 @@ or as a counter, which is also visible in the voice channel card. The
 track title can replace the app name in the member list, and two buttons
 sit under the status.
 
-Works both in the regular player and in "Моя волна" (My Wave).
+Works both in the regular player and in "Моя волна" (My Wave). On pause the status is cleared
+after a couple of seconds, and it stays in place when the track changes.
+
+<p>
+<img src="../images/discord-profile.png" height="360" alt="Status in the Discord profile">
+&nbsp;
+<img src="../images/discord-voice.png" height="160" alt="Status with buttons on hover">
+</p>
 
 </details>
 
