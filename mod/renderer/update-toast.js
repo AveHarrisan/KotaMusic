@@ -5,7 +5,10 @@
 const { ipcRenderer } = require('electron');
 
 ipcRenderer.on('kotamusic:update:available', (_event, update) => {
-  if (document.querySelector('[data-kotamusic-update]')) return;
+  const shown = document.querySelector('[data-kotamusic-update]');
+  if (shown && !update.manual) return;
+  shown?.remove();
+  document.querySelector('[data-kotamusic-toast]')?.remove();
 
   const box = document.createElement('div');
   box.setAttribute('data-kotamusic-update', '1');

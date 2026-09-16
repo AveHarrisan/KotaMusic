@@ -499,9 +499,9 @@ function fill(container) {
         'Снимать статус на паузе',
         'Пока пауза короче этого срока, в статусе написано «на паузе»',
         choice(
-          [[0, 'Сразу'], [1, '1 мин'], [5, '5 мин'], [15, '15 мин'], [60, '1 час']],
-          config.pauseClearMinutes,
-          (value) => update({ pauseClearMinutes: value })
+          [[0, 'Сразу'], [10, '10 с'], [60, '1 мин'], [300, '5 мин'], [900, '15 мин']],
+          config.pauseClearSeconds,
+          (value) => update({ pauseClearSeconds: value })
         )
       ),
       row(

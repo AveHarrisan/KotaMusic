@@ -81,8 +81,8 @@ function label(text) {
 }
 
 function pauseLimitMs() {
-  const minutes = Number(settings.get().pauseClearMinutes);
-  return Number.isFinite(minutes) && minutes >= 0 ? minutes * 60000 : 15 * 60000;
+  const seconds = Number(settings.get().pauseClearSeconds);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 10000;
 }
 
 /** Пересобрать статус, когда пауза подтвердится и когда истечёт срок. */

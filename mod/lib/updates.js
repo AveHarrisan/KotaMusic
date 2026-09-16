@@ -29,9 +29,9 @@ const log = require('./log');
 
 const API = `https://api.github.com/repos/${branding.repositoryUrl.split('github.com/')[1]}/releases`;
 
-// Первый раз — когда клиент уже прогрузился, дальше раз в шесть часов.
+// Первый раз — когда клиент уже прогрузился, дальше раз в час.
 const FIRST_DELAY_MS = 60 * 1000;
-const INTERVAL_MS = 6 * 60 * 60 * 1000;
+const INTERVAL_MS = 60 * 60 * 1000;
 
 let announced = null;
 
@@ -226,14 +226,14 @@ async function apply(update, onProgress) {
   setTimeout(() => app.exit(0), 500);
 }
 
-function notify(update) {
+function notify(update, manual = false) {
   const key = `${update.kind}:${update.tag || update.target}`;
   if (announced === key) return;
   announced = key;
 
   for (const window of BrowserWindow.getAllWindows()) {
     if (window.isDestroyed() || window.getTitle?.() === branding.name) continue;
-    window.webContents.send('kotamusic:update:available', update);
+    window.webContents.send('kotamusic:update:available', { ...update, manual });
   }
 
   log.info(
@@ -263,7 +263,7 @@ async function plan() {
   const pretendNewClient = Boolean(process.env.KOTAMUSIC_CLIENT_TEST);
 
   // Клиент новее нашего: обновляемся вместе, но только когда сборка мода
-  // под эту версию уже есть. Иначе ждём автосборку — она идёт раз в три часа.
+  // под эту версию уже есть. Иначе ждём автосборку — она идёт раз в час.
   if (official && (pretendNewClient || newer(official.version, installed))) {
     if (release && release.clientVersion === official.version) {
       return { kind: 'client', ...release, installed, clientUrl: official.url, target: official.version };
@@ -295,9 +295,28 @@ async function check() {
 
   try {
     const update = await plan();
+    // Про клиент, под который мод ещё не собран, человеку не пишем:
+    // клиент и так удерживается на прежней версии, а сообщение появится,
+    // когда будет что ставить.
+    if (update?.kind === 'waiting') return log.info(`Вышел клиент ${update.target}, жду сборку мода под него`);
     if (update) notify(update);
   } catch (e) {
     log.debug('Проверка обновлений не удалась:', e.message);
+  }
+}
+
+/** Проверка по кнопке: окно показываем, даже если его уже закрывали. */
+async function checkNow() {
+  try {
+    const update = await plan();
+    if (!update || update.kind === 'waiting') return { found: false };
+
+    announced = null;
+    notify(update, true);
+    return { found: true };
+  } catch (e) {
+    log.warn('Проверка обновлений по кнопке не удалась:', e.message);
+    return { found: false, error: true };
   }
 }
 
@@ -345,6 +364,8 @@ function start() {
       event.sender.send('kotamusic:update:failed', e.message);
     }
   });
+
+  ipcMain.handle('kotamusic:update:check', () => checkNow());
 
   setTimeout(check, FIRST_DELAY_MS);
   setInterval(check, INTERVAL_MS);

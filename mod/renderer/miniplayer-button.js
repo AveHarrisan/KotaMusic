@@ -9,6 +9,7 @@ const { ipcRenderer } = require('electron');
 
 const MARK = 'kotamusic-miniplayer-button';
 const LOCK_MARK = 'kotamusic-miniplayer-lock';
+const UPDATE_MARK = 'kotamusic-update-button';
 const VERSION = /^\d+\.\d+\.\d+$/;
 
 // Пока плеер не нарисован, интерфейс клиента ещё собирается — до этого
@@ -23,6 +24,14 @@ const LOCK_ICON = (closed) =>
     ? '<path d="M2.6 5V3.4a2.9 2.9 0 0 1 5.8 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/>'
     : '<path d="M2.6 5V3.4a2.9 2.9 0 0 1 5.6-1" stroke="currentColor" stroke-width="1.4" fill="none"/>') +
   '<rect x="1" y="5" width="9" height="7" rx="1.6" fill="currentColor"/></svg>';
+
+// Две стрелки по кругу — «проверить обновления».
+const UPDATE_ICON =
+  '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+  '<path d="M13.5 6.5A5.6 5.6 0 0 0 3.2 4.6M2.5 9.5a5.6 5.6 0 0 0 10.3 1.9" ' +
+  'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+  '<path d="M3 1.8v3.1h3.1M13 14.2v-3.1H9.9" stroke="currentColor" stroke-width="1.6" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // Отступ от плашки версии.
 const GAP = 8;
@@ -68,6 +77,7 @@ function visibleCount() {
 let enabled = true;
 let button = null;
 let lock = null;
+let updater = null;
 let locked = false;
 
 /**
@@ -142,7 +152,7 @@ function place() {
         ? Math.round(window.innerHeight - barRect.top + 12)
         : 12;
 
-    for (const node of [button, lock]) {
+    for (const node of [button, lock, updater]) {
       if (!node) continue;
       node.style.bottom = `${bottom}px`;
       node.style.height = '22px';
@@ -154,13 +164,7 @@ function place() {
     button.style.paddingLeft = '12px';
     button.style.paddingRight = '12px';
 
-    if (lock) {
-      const width = button.getBoundingClientRect().width || 0;
-      lock.style.right = `${Math.round(12 + width + GAP)}px`;
-      lock.style.width = '22px';
-      lock.style.padding = '0';
-    }
-
+    placeSquares(12 + (button.getBoundingClientRect().width || 0) + GAP, 22);
     return;
   }
 
@@ -168,7 +172,7 @@ function place() {
   const style = getComputedStyle(badge);
   const height = Math.round(rect.height);
 
-  for (const node of [button, lock]) {
+  for (const node of [button, lock, updater]) {
     if (!node) continue;
     node.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
     node.style.height = `${height}px`;
@@ -189,11 +193,17 @@ function place() {
   button.style.paddingLeft = style.paddingLeft;
   button.style.paddingRight = style.paddingRight;
 
-  if (lock) {
-    const width = button.getBoundingClientRect().width || 0;
-    lock.style.right = `${Math.round(window.innerWidth - rect.left + GAP * 2 + width)}px`;
-    lock.style.width = `${height}px`;
-    lock.style.padding = '0';
+  placeSquares(window.innerWidth - rect.left + GAP * 2 + (button.getBoundingClientRect().width || 0), height);
+}
+
+/** Квадратные кнопки — замок и обновление — встают цепочкой левее. */
+function placeSquares(right, size) {
+  for (const node of [lock, updater]) {
+    if (!node) continue;
+    node.style.right = `${Math.round(right)}px`;
+    node.style.width = `${size}px`;
+    node.style.padding = '0';
+    right += size + GAP;
   }
 }
 
@@ -228,6 +238,7 @@ function build() {
 
   document.body.appendChild(button);
   buildLock();
+  buildUpdater();
   place();
 }
 
@@ -261,6 +272,48 @@ function buildLock() {
   setLocked(locked);
 }
 
+/** Проверка обновлений вручную — если сообщение об обновлении закрыли. */
+function buildUpdater() {
+  if (document.querySelector(`[data-${UPDATE_MARK}]`)) return;
+
+  updater = document.createElement('button');
+  updater.setAttribute(`data-${UPDATE_MARK}`, '1');
+  updater.type = 'button';
+  updater.title = 'Проверить обновления KotaMusic';
+  updater.innerHTML = UPDATE_ICON;
+
+  updater.style.cssText =
+    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'height:22px;border-radius:6px;' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'border:none;background:rgba(255,255,255,.1);cursor:pointer;' +
+    'color:rgba(255,255,255,.75);' +
+    'transition:background .12s,color .12s,opacity .12s;-webkit-app-region:no-drag';
+
+  updater.addEventListener('mouseenter', () => (updater.style.background = 'rgba(255,255,255,.22)'));
+  updater.addEventListener('mouseleave', () => (updater.style.background = 'rgba(255,255,255,.1)'));
+
+  updater.addEventListener('click', async () => {
+    if (updater.disabled) return;
+    updater.disabled = true;
+    updater.style.opacity = '.5';
+
+    let result = null;
+    try {
+      result = await ipcRenderer.invoke('kotamusic:update:check');
+    } catch {}
+
+    updater.disabled = false;
+    updater.style.opacity = '';
+
+    // Если обновление есть, главный процесс сам покажет окно обновления.
+    if (result?.found) return;
+    showToast(result?.error ? 'Не удалось проверить обновления. Попробуйте позже.' : 'Обновлений нет — у вас последняя версия.');
+  });
+
+  document.body.appendChild(updater);
+}
+
 function setLocked(value) {
   locked = Boolean(value);
 
@@ -275,6 +328,31 @@ function setLocked(value) {
   lock.title = locked
     ? 'Мини-плеер закреплён и не ловит нажатия: снять фиксацию'
     : 'Закрепить мини-плеер: станет прозрачным и перестанет ловить нажатия';
+}
+
+/** Короткое сообщение в том же углу. */
+function showToast(message) {
+  document.querySelector('[data-kotamusic-toast]')?.remove();
+
+  const toast = document.createElement('div');
+  toast.setAttribute('data-kotamusic-toast', '1');
+  toast.style.cssText =
+    'position:fixed;right:12px;bottom:48px;z-index:2147483646;max-width:260px;' +
+    'padding:12px 14px;border-radius:12px;background:#2a2a2a;color:#fff;' +
+    'font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);' +
+    'opacity:0;transition:opacity .2s;-webkit-app-region:no-drag';
+
+  toast.innerHTML = '<b style="display:block;margin-bottom:4px">KotaMusic</b>';
+  toast.appendChild(document.createTextNode(message));
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => (toast.style.opacity = '1'));
+
+  const hide = () => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  };
+  toast.addEventListener('click', hide);
+  setTimeout(hide, 4000);
 }
 
 /** Короткая подсказка о кнопке — показывается один раз. */

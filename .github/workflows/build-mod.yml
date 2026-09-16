@@ -5,7 +5,7 @@ name: Сборка мода
 # поэтому собираем один раз из самого лёгкого установщика — .deb.
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
   push:
     paths:
@@ -14,6 +14,11 @@ on:
       - 'scripts/**'
       - 'package.json'
       - '.github/workflows/build-mod.yml'
+
+# Два прогона подряд (push за push'ем) толкались при записи значков.
+concurrency:
+  group: build-mod
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -124,6 +129,8 @@ jobs:
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git add docs/badges
           git commit -m "Значки: свежие числа загрузок и версии"
+          # Пока шла сборка, в ветку могли запушить ещё — подтягиваемся.
+          git pull --rebase
           git push
 
       - name: Выложить релиз
