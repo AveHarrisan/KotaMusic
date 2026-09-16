@@ -47,6 +47,8 @@ async function main() {
     version = latest;
     console.log(`Клиент Яндекс Музыки: ${version} (${platform})`);
 
+    if (!downloads[key]) throw new Error(`Установщика ${version} для ${key} на раздаче пока нет`);
+
     stage = path.join(WORK, `${version}-${platform}`);
     const installer = path.join(stage, path.basename(new URL(downloads[key]).pathname));
 
@@ -62,6 +64,13 @@ async function main() {
       console.log('Достаю app.asar…');
       await upstream.extractAsar(installer, platform, stage);
     }
+  }
+
+  // Страховка: версия внутри архива обязана совпадать с той, под которую
+  // собираемся, иначе релиз окажется подписан чужой версией клиента.
+  const inside = JSON.parse(asar.extractFile(asarPath, 'package.json').toString('utf8')).version;
+  if (inside !== version) {
+    throw new Error(`В установщике клиент ${inside}, а ждали ${version} — сборку останавливаю`);
   }
 
   const extracted = path.join(stage, 'extracted');

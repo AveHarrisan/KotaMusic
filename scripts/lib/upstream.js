@@ -7,20 +7,46 @@ const fsp = require('fs/promises');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const META_URL = 'https://music-desktop-application.s3.yandex.net/stable/latest.yml';
-const DOWNLOAD_URL = 'https://music-desktop-application.s3.yandex.net/stable/download.json';
+const META_BASE = 'https://music-desktop-application.s3.yandex.net/stable/';
+const CDN_BASE = 'https://desktop.app.music.yandex.net/stable/';
 
-/** Текущая версия клиента и адреса установщиков. */
+// ⚠️ Ссылки берём из тех же файлов, что и версию. download.json у Яндекса
+// обновляется позже: 16.09.2026 latest.yml уже говорил 5.120.0, а
+// download.json ещё отдавал установщики 5.119.0 — и под видом 5.120
+// собрался и разошёлся мод из клиента 5.119.
+const SOURCES = {
+  windows: { meta: 'latest.yml', file: /\.exe$/ },
+  macos: { meta: 'latest-mac.yml', file: /\.dmg$/ },
+  linux: { meta: 'latest-linux.yml', file: /\.deb$/ },
+};
+
+/** Версия из yml и имя нужного файла из списка files. */
+function parseMeta(text, pattern) {
+  const version = /^version:\s*(.+)$/m.exec(text)?.[1]?.trim();
+  const base = /^\s*UPDATE_URL:\s*(\S+)\s*$/m.exec(text)?.[1] || CDN_BASE;
+  const names = [...text.matchAll(/^\s*(?:-\s*url|path):\s*(\S+)\s*$/gm)].map((m) => m[1]);
+  const file = names.find((name) => pattern.test(name));
+  return { version, url: file ? new URL(file, base.endsWith('/') ? base : base + '/').href : null };
+}
+
+/** Текущая версия клиента и адреса установщиков именно этой версии. */
 async function getLatest() {
-  const [ymlRes, jsonRes] = await Promise.all([fetch(META_URL), fetch(DOWNLOAD_URL)]);
-  if (!ymlRes.ok) throw new Error(`latest.yml: HTTP ${ymlRes.status}`);
-  if (!jsonRes.ok) throw new Error(`download.json: HTTP ${jsonRes.status}`);
+  const downloads = {};
+  let version = null;
 
-  const yml = await ymlRes.text();
-  const version = /^version:\s*(.+)$/m.exec(yml)?.[1]?.trim();
+  for (const [key, source] of Object.entries(SOURCES)) {
+    const res = await fetch(META_BASE + source.meta);
+    if (!res.ok) throw new Error(`${source.meta}: HTTP ${res.status}`);
+
+    const meta = parseMeta(await res.text(), source.file);
+    if (key === 'windows') version = meta.version;
+    // Раздача под разные системы может обновляться не одновременно —
+    // ссылку на чужую версию не отдаём вовсе.
+    if (meta.url && meta.version === version) downloads[key] = meta.url;
+  }
+
   if (!version) throw new Error('Не удалось прочитать версию из latest.yml');
-
-  return { version, downloads: await jsonRes.json() };
+  return { version, downloads };
 }
 
 async function download(url, dest) {
@@ -93,4 +119,5 @@ function findFile(dir, name) {
   return null;
 }
 
-module.exports = { getLatest, download, extractAsar, META_URL, DOWNLOAD_URL };
+module.exports = {
+  parseMeta, getLatest, download, extractAsar, META_BASE, CDN_BASE };

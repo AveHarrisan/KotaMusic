@@ -11,25 +11,37 @@ const path = require('path');
 // файл, поэтому хватает и штатного модуля.
 const fs = require('fs');
 
-const META_URL = 'https://music-desktop-application.s3.yandex.net/stable/latest.yml';
-const DOWNLOAD_URL = 'https://music-desktop-application.s3.yandex.net/stable/download.json';
+const META_BASE = 'https://music-desktop-application.s3.yandex.net/stable/';
+const CDN_BASE = 'https://desktop.app.music.yandex.net/stable/';
 
-const KEY = { win32: 'windows', darwin: 'macos', linux: 'linux' };
+// ⚠️ Адрес установщика берём из того же файла, что и версию: download.json
+// у Яндекса отстаёт, и 16.09.2026 вместо 5.120.0 ставился прежний 5.119.0 —
+// человек жал «Обновить», а клиент оставался старым.
+const SOURCE = {
+  win32: { meta: 'latest.yml', file: /\.exe$/ },
+  darwin: { meta: 'latest-mac.yml', file: /\.dmg$/ },
+  linux: { meta: 'latest-linux.yml', file: /\.deb$/ },
+};
 
-/** Текущая версия клиента и адрес установщика под эту систему. */
+/** Текущая версия клиента и адрес установщика именно этой версии. */
 async function latest() {
-  const [meta, downloads] = await Promise.all([fetch(META_URL), fetch(DOWNLOAD_URL)]);
+  const source = SOURCE[process.platform];
+  if (!source) throw new Error('Для этой системы установщика нет');
 
-  if (!meta.ok) throw new Error(`latest.yml: HTTP ${meta.status}`);
-  if (!downloads.ok) throw new Error(`download.json: HTTP ${downloads.status}`);
+  const response = await fetch(META_BASE + source.meta);
+  if (!response.ok) throw new Error(`${source.meta}: HTTP ${response.status}`);
 
-  const version = /^version:\s*(.+)$/m.exec(await meta.text())?.[1]?.trim();
-  const urls = await downloads.json();
-  const url = urls[KEY[process.platform]];
+  const text = await response.text();
+  const version = /^version:\s*(.+)$/m.exec(text)?.[1]?.trim();
+  const base = /^\s*UPDATE_URL:\s*(\S+)\s*$/m.exec(text)?.[1] || CDN_BASE;
+  const file = [...text.matchAll(/^\s*(?:-\s*url|path):\s*(\S+)\s*$/gm)]
+    .map((m) => m[1])
+    .find((name) => source.file.test(name));
 
-  if (!url) throw new Error('Для этой системы установщика нет');
+  if (!version || !file) throw new Error(`${source.meta}: нет версии или установщика`);
+  if (!file.includes(version)) throw new Error(`Установщик ${file} не от версии ${version}`);
 
-  return { version, url };
+  return { version, url: new URL(file, base.endsWith('/') ? base : `${base}/`).href };
 }
 
 /** Качает установщик клиента во временную папку. */
