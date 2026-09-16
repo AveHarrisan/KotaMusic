@@ -20,7 +20,7 @@ const TIME_REFRESH_MS = 10000; // как часто переписываем в�
 const MIN_INTERVAL_MS = 2000; // Discord ограничивает частоту обновлений
 const SEEK_TOLERANCE_S = 3; // расхождение, после которого считаем это перемоткой
 const CLEAR_GRACE_MS = 6000; // на стыке треков плеер на миг «не играет»
-const PAUSE_CONFIRM_MS = 1500; // на стыке треков плеер на миг «на паузе»
+const PAUSE_CONFIRM_MS = 2500; // на стыке треков плеер на миг «на паузе»
 const STALL_MS = 15000; // столько время трека стоит на месте — значит, пауза
 const WEB_BASE = 'https://music.yandex.ru';
 

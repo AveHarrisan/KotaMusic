@@ -20,7 +20,7 @@ const DEFAULTS = {
   showTrackInMemberList: branding.discord.modernFields,
   showAlbum: true,
   // Через сколько секунд паузы снимать статус; 0 — сразу.
-  pauseClearSeconds: 10,
+  pauseClearSeconds: 0,
   discordApplicationId: branding.discord.applicationId,
 
   // Мини-плеер поверх других окон.
