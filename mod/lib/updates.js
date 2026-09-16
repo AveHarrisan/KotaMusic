@@ -221,9 +221,78 @@ async function apply(update, onProgress) {
     ).unref();
   }
 
+  // Запоминаем, что ждём после перезапуска: по этому файлу новый запуск
+  // скажет человеку, получилось ли, и уберёт скачанное.
+  try {
+    fs.writeFileSync(
+      pendingFile(),
+      JSON.stringify({
+        mod: update.modVersion || null,
+        client: update.clientUrl ? update.target || update.clientVersion : null,
+        at: Date.now(),
+      })
+    );
+  } catch (e) {
+    log.warn('Не удалось записать отметку об обновлении:', e.message);
+  }
+
   // Именно exit: клиент умеет прятаться в область уведомлений, а нам
   // нужно, чтобы он действительно вышел и отпустил свои файлы.
   setTimeout(() => app.exit(0), 500);
+}
+
+const pendingFile = () => path.join(app.getPath('userData'), 'kotamusic-pending-update.json');
+
+/** Удаляет файл или папку, не падая, если их уже нет или они заняты. */
+function remove(target) {
+  try {
+    ofs.rmSync(target, { recursive: true, force: true });
+    return true;
+  } catch (e) {
+    log.debug('Не удалось удалить', target, e.message);
+    return false;
+  }
+}
+
+/**
+ * После перезапуска: сообщаем, встало ли обновление, и убираем за собой
+ * скачанные установщик клиента и архивы мода — это сотни мегабайт.
+ */
+function finishUpdate() {
+  let pending = null;
+  try {
+    pending = JSON.parse(fs.readFileSync(pendingFile(), 'utf8'));
+  } catch {
+    return;
+  }
+  remove(pendingFile());
+
+  const client = app.getVersion?.() || branding.builtForClient;
+  const modOk = !pending.mod || pending.mod === branding.version;
+  const clientOk = !pending.client || pending.client === client;
+
+  if (modOk && clientOk) {
+    const cleaned = [
+      path.join(require('os').tmpdir(), 'kotamusic-client'),
+      path.join(app.getPath('userData'), 'kotamusic-updates'),
+      path.join(process.resourcesPath, 'app.asar.before-update'),
+      `${process.execPath}.old`,
+    ].filter((target) => ofs.existsSync(target) && remove(target));
+
+    log.info(`Обновление встало: мод ${branding.version}, клиент ${client}; убрано: ${cleaned.length}`);
+    require('./notice').show(
+      `Обновление установлено: KotaMusic ${branding.version}, Яндекс Музыка ${client}.`,
+      { kind: 'info' }
+    );
+    return;
+  }
+
+  // Скачанное не трогаем: пригодится для повторной попытки.
+  log.warn(`Обновление не встало: ждали мод ${pending.mod}, клиент ${pending.client}; сейчас ${branding.version}, ${client}`);
+  require('./notice').show(
+    `Обновление не установилось: сейчас KotaMusic ${branding.version}, Яндекс Музыка ${client}. ` +
+      'Попробуйте ещё раз кнопкой со стрелками рядом с версией.'
+  );
 }
 
 function notify(update, manual = false) {
@@ -366,6 +435,12 @@ function start() {
   });
 
   ipcMain.handle('kotamusic:update:check', () => checkNow());
+
+  try {
+    finishUpdate();
+  } catch (e) {
+    log.warn('Проверка итогов обновления не удалась:', e.message);
+  }
 
   setTimeout(check, FIRST_DELAY_MS);
   setInterval(check, INTERVAL_MS);
