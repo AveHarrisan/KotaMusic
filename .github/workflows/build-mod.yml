@@ -100,6 +100,16 @@ jobs:
           published=$(gh release download "$TAG" --pattern build-info.json --output - 2>/dev/null \
             | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).modVersion || ''" 2>/dev/null || true)
 
+          # Выкладка идёт двумя файлами, и однажды app.asar не догрузился:
+          # версия в релизе уже новая, а самого мода нет — и прогон
+          # «ничего не выкладываем» оставил релиз сломанным.
+          if ! gh release view "$TAG" --json assets \
+              --jq '.assets[].name' 2>/dev/null | grep -qx 'app.asar'; then
+            echo "publish=true" >> $GITHUB_OUTPUT
+            echo "В релизе нет app.asar — выкладываем заново."
+            exit 0
+          fi
+
           if [ "$published" = "$MOD" ]; then
             echo "publish=false" >> $GITHUB_OUTPUT
             echo "В релизе уже мод $published — выкладывать нечего."
