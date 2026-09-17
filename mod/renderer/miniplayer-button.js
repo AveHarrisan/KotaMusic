@@ -131,6 +131,47 @@ function versionBadge() {
   )[0];
 }
 
+// Регулятор громкости клиента выезжает вверх узкой полосой и накрывает
+// наши кнопки — пока он открыт, кнопки прячем.
+const VOLUME = '[data-test-id="CHANGE_VOLUME_SLIDER"]';
+
+/** Элемент действительно виден: не спрятан и не прозрачен. */
+function visible(node) {
+  for (let el = node; el && el !== document.body; el = el.parentElement) {
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    if (Number(style.opacity) === 0) return false;
+  }
+  return true;
+}
+
+/** Прямоугольники пересекаются (с небольшим запасом). */
+function overlaps(a, b, gap = 6) {
+  return (
+    a.left - gap < b.right && a.right + gap > b.left && a.top - gap < b.bottom && a.bottom + gap > b.top
+  );
+}
+
+/** Прячет кнопки, если регулятор громкости накрыл их. */
+function dodgeVolume() {
+  const nodes = [button, lock, updater].filter(Boolean);
+  if (!nodes.length) return;
+
+  const slider = document.querySelector(VOLUME);
+  const rect = slider?.getBoundingClientRect();
+  // У ползунка в панели плеера ширина больше высоты, а у выехавшего
+  // регулятора наоборот — по этому его и отличаем от постоянного.
+  // ⚠️Закрытый регулятор остаётся в разметке, только спрятанный, поэтому
+  // мало его найти — надо убедиться, что он и правда виден.
+  const popup =
+    rect && rect.width > 0 && rect.height > rect.width && visible(slider);
+
+  for (const node of nodes) {
+    const hide = popup && overlaps(node.getBoundingClientRect(), rect);
+    node.style.visibility = hide ? 'hidden' : '';
+  }
+}
+
 /**
  * Держим кнопку слева от плашки и в точности такой же: размер, скругление
  * и шрифт берём у самой плашки, чтобы пара выглядела единым целым.
@@ -432,9 +473,14 @@ function start() {
         if (!enabled) return;
         build();
         place();
+        dodgeVolume();
       }).observe(document.body, { childList: true, subtree: true });
 
       window.addEventListener('resize', place);
+
+      // Регулятор появляется без изменений в разметке (только стили),
+      // поэтому проверяем его и по времени.
+      setInterval(dodgeVolume, 300);
     }, 200);
   });
 }
