@@ -143,17 +143,44 @@ jobs:
           git pull --rebase
           git push
 
+      # Выкладываем сами, а не готовым действием: однажды оно удалило
+      # старые файлы, выложило build-info.json и молча упало, не догрузив
+      # app.asar, — релиз остался с новой версией и без самого мода.
+      # Поэтому: сначала мод, отметка о версии последней, и с повторами.
       - name: Выложить релиз
         if: steps.check.outputs.publish == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: mod-${{ steps.info.outputs.client }}
-          name: KotaMusic для Яндекс Музыки ${{ steps.info.outputs.client }}
-          body_path: release-body.md
-          files: |
-            dist/app.asar
-            dist/build-info.json
-          fail_on_unmatched_files: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: mod-${{ steps.info.outputs.client }}
+          CLIENT: ${{ steps.info.outputs.client }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "KotaMusic для Яндекс Музыки $CLIENT" --notes-file release-body.md
+          else
+            gh release create "$TAG" --title "KotaMusic для Яндекс Музыки $CLIENT" --notes-file release-body.md
+          fi
+
+          upload() {
+            for attempt in 1 2 3; do
+              if gh release upload "$TAG" "$1" --clobber; then
+                echo "$1 выложен (попытка $attempt)"
+                return 0
+              fi
+              echo "Попытка $attempt не удалась, повторяю через 15 с" >&2
+              sleep 15
+            done
+            return 1
+          }
+
+          upload dist/app.asar
+          upload dist/build-info.json
+
+          # Проверяем глазами прогона: оба файла на месте.
+          gh release view "$TAG" --json assets --jq '.assets[].name' | sort | tee /tmp/assets
+          grep -qx 'app.asar' /tmp/assets
+          grep -qx 'build-info.json' /tmp/assets
 
   # Сборка падает, если врезка не нашла своё место в новом коде клиента.
   # Тогда заводим задачу вместо тихого пропуска обновления.
