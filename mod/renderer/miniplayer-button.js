@@ -377,6 +377,11 @@ function buildQuality() {
   quality.setAttribute(`data-${QUALITY_MARK}`, '1');
   quality.title = 'Качество трека';
 
+  quality.style.cursor = 'pointer';
+  quality.addEventListener('click', openSoundSettings);
+  quality.addEventListener('mouseenter', () => (quality.style.background = 'rgba(255,255,255,.22)'));
+  quality.addEventListener('mouseleave', () => (quality.style.background = 'rgba(255,255,255,.1)'));
+
   quality.style.cssText =
     'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
     'height:22px;border-radius:6px;display:none;align-items:center;justify-content:center;' +
@@ -384,6 +389,44 @@ function buildQuality() {
     'font-weight:600;letter-spacing:.02em;white-space:nowrap;-webkit-app-region:no-drag';
 
   document.body.appendChild(quality);
+}
+
+/**
+ * Открывает настройки звука клиента. В панели плеера для этого есть своя
+ * кнопка, а в «Моей волне» — только пункт в меню, поэтому там открываем
+ * меню и нажимаем нужный пункт.
+ */
+function openSoundSettings() {
+  const own = document.querySelector('[data-test-id="SOUND_QUALITY_BUTTON"]');
+  if (own) return own.click();
+
+  // Ищем «…» только в панели плеера: такие же кнопки есть у карточек
+  // на странице, и нажатие ушло бы не туда.
+  const bar = document.querySelector(PLAYERBAR);
+  const opener =
+    bar?.querySelector('[data-test-id$="CONTEXT_MENU_BUTTON"]') ||
+    bar?.parentElement?.querySelector('[data-test-id$="CONTEXT_MENU_BUTTON"]');
+
+  if (!opener) return;
+
+  opener.click();
+
+  // Меню рисуется не мгновенно — ждём и ищем в нём нужный пункт.
+  let tries = 0;
+  const look = setInterval(() => {
+    tries += 1;
+
+    const item = [...document.querySelectorAll('button,[role="menuitem"]')].find((node) =>
+      /Настройки звука/i.test(node.textContent || '')
+    );
+
+    if (item) {
+      clearInterval(look);
+      item.click();
+    } else if (tries > 20) {
+      clearInterval(look);
+    }
+  }, 50);
 }
 
 /** Бегущая строка дублирует текст — берём самый короткий повтор. */

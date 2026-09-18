@@ -201,6 +201,44 @@ async function coverFor(track) {
   return covers.get(uri);
 }
 
+/**
+ * Уже скачан? Ищем файл с тем же именем в любом из известных форматов.
+ * Возвращает путь и время создания — их показываем человеку.
+ */
+function alreadyHave(track, dir) {
+  const folder = dir || targetDir();
+  const base = fileNameFor(track, 'flac').replace(/\.flac$/, '');
+
+  for (const kind of ['flac', 'mp3', 'm4a']) {
+    const file = path.join(folder, `${base}.${kind}`);
+    try {
+      const about = fs.statSync(file);
+      return { file, at: about.mtimeMs };
+    } catch {
+      /* нет такого файла */
+    }
+  }
+
+  return null;
+}
+
+/** Спрашивает папку, если её ещё ни разу не выбирали. */
+async function ensureDir() {
+  if (settings.get().downloadDir) return settings.get().downloadDir;
+
+  const result = await dialog.showOpenDialog({
+    title: 'Куда сохранять скачанные треки',
+    defaultPath: targetDir(),
+    buttonLabel: 'Сохранять сюда',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+
+  if (result.canceled || !result.filePaths.length) return null;
+
+  settings.set({ downloadDir: result.filePaths[0] });
+  return result.filePaths[0];
+}
+
 /** Скачивает трек и возвращает путь к файлу. */
 async function downloadTrack(track, { dir, mp3, onProgress } = {}) {
   const info = await api.fileInfo(track.id, { mp3 });
@@ -255,22 +293,30 @@ function enqueue(task) {
 }
 
 /** Скачивание одного трека по его номеру. */
-async function single(trackId) {
+async function single(trackId, { dir = null, force = false } = {}) {
   const [track] = await api.tracksMeta([trackId]);
   if (!track) throw new Error('Трек не найден');
 
   const title = `${track.title} — ${artistsOf(track)}`;
+
+  // Такой файл уже лежит — спросим человека, качать ли заново.
+  if (!force) {
+    const have = alreadyHave(track, dir);
+    if (have) return { exists: true, title, ...have };
+  }
+
   report({ id: 'single', title, share: 0 });
 
   try {
     const file = await downloadTrack(track, {
+      dir,
       mp3: settings.get().downloadMp3,
       onProgress: (share) => report({ id: 'single', title, share }),
     });
 
     report({ id: 'single', title, share: 1, done: true, file });
     log.info('Скачан трек:', file);
-    return file;
+    return { file };
   } catch (e) {
     report({ id: 'single', title, done: true, error: e.message });
     throw e;
@@ -278,12 +324,11 @@ async function single(trackId) {
 }
 
 /** Скачивание списка треков в свою папку. */
-async function many(tracks, title) {
+async function many(tracks, title, { ownFolder = null, force = false } = {}) {
   // Альбом и плейлист по желанию ложатся в свою папку — так удобнее
   // искать, — или вперемешку с остальным, одной кучей.
-  const folder = settings.get().downloadAlbumFolder === false
-    ? targetDir()
-    : path.join(targetDir(), safeName(title));
+  const separate = ownFolder === null ? settings.get().downloadAlbumFolder !== false : ownFolder;
+  const folder = separate ? path.join(targetDir(), safeName(title)) : targetDir();
 
   fs.mkdirSync(folder, { recursive: true });
 
@@ -305,12 +350,21 @@ async function many(tracks, title) {
 
   const mp3 = settings.get().downloadMp3;
   const errors = [];
+  let skipped = 0;
   let index = 0;
 
   const worker = async () => {
     while (index < tracks.length) {
       const current = tracks[index];
       index += 1;
+
+      if (!force && alreadyHave(current, folder)) {
+        skipped += 1;
+        shares.set(current.id, 1);
+        finished += 1;
+        tell();
+        continue;
+      }
 
       try {
         await downloadTrack(current, {
@@ -334,10 +388,10 @@ async function many(tracks, title) {
 
   await Promise.all(Array.from({ length: Math.min(PARALLEL, tracks.length) }, worker));
 
-  report({ id: 'many', title, share: 1, done: true, folder, errors: errors.length });
-  log.info(`Скачано ${finished - errors.length} из ${total}: ${folder}`);
+  report({ id: 'many', title, share: 1, done: true, folder, errors: errors.length, skipped });
+  log.info(`Скачано ${finished - errors.length - skipped} из ${total} (уже было: ${skipped}): ${folder}`);
 
-  return { folder, total, failed: errors.length };
+  return { folder, total, failed: errors.length, skipped };
 }
 
 /** Проверка скачивания без интерфейса: номер трека задаётся переменной. */
@@ -374,8 +428,8 @@ function selfTest() {
       }
 
       log.info('Проверка скачивания, трек', id);
-      const file = await single(id);
-      log.info('Проверка: готово', file, fs.statSync(file).size, 'байт');
+      const done = await single(id, { force: true });
+      log.info('Проверка: готово', done.file, fs.statSync(done.file).size, 'байт');
     } catch (e) {
       log.warn('Проверка скачивания не удалась:', e.stack || e.message);
     }
@@ -385,11 +439,16 @@ function selfTest() {
 function start() {
   selfTest();
 
-  ipcMain.handle('kotamusic:download:track', async (_event, trackId) =>
+  ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) =>
     enqueue(async () => {
       try {
-        const file = await single(trackId);
-        return { ok: true, file };
+        // Первое скачивание: спросим, где держать музыку.
+        if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
+
+        const done = await single(trackId, options);
+        if (done.exists) return { ok: false, ...done };
+
+        return { ok: true, file: done.file };
       } catch (e) {
         log.warn('Скачивание не удалось:', e.message);
         notice.show(`Не удалось скачать трек: ${e.message}`);
@@ -403,11 +462,15 @@ function start() {
   ipcMain.handle('kotamusic:download:current', async (_event, about) =>
     enqueue(async () => {
       try {
-        const track = await api.findTrack(about || {});
+        if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
+
+        const track = await api.findTrack(about?.track || about || {});
         if (!track?.id) throw new Error('Не нашёл этот трек в Яндекс Музыке');
 
-        const file = await single(track.id);
-        return { ok: true, file };
+        const done = await single(track.id, about?.options || {});
+        if (done.exists) return { ok: false, ...done };
+
+        return { ok: true, file: done.file };
       } catch (e) {
         log.warn('Скачивание не удалось:', e.message);
         notice.show(`Не удалось скачать трек: ${e.message}`);
@@ -416,11 +479,13 @@ function start() {
     })
   );
 
-  ipcMain.handle('kotamusic:download:album', async (_event, albumId) =>
+  ipcMain.handle('kotamusic:download:album', async (_event, albumId, options = {}) =>
     enqueue(async () => {
       try {
+        if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
+
         const { title, tracks } = await api.albumTracks(albumId);
-        const result = await many(tracks, title || `Альбом ${albumId}`);
+        const result = await many(tracks, title || `Альбом ${albumId}`, options);
         return { ok: true, ...result };
       } catch (e) {
         log.warn('Альбом не скачался:', e.message);
@@ -430,11 +495,13 @@ function start() {
     })
   );
 
-  ipcMain.handle('kotamusic:download:playlist', async (_event, owner, kind) =>
+  ipcMain.handle('kotamusic:download:playlist', async (_event, owner, kind, options = {}) =>
     enqueue(async () => {
       try {
+        if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
+
         const { title, tracks } = await api.playlistTracks(owner, kind);
-        const result = await many(tracks, title || 'Плейлист');
+        const result = await many(tracks, title || 'Плейлист', options);
         return { ok: true, ...result };
       } catch (e) {
         log.warn('Плейлист не скачался:', e.message);
@@ -481,6 +548,17 @@ function start() {
       log.debug('Качество трека узнать не вышло:', e.message);
       return null;
     }
+  });
+
+  // Разовый выбор папки: настройку не меняем, качаем один раз туда.
+  ipcMain.handle('kotamusic:download:pick', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Куда сохранить на этот раз',
+      defaultPath: targetDir(),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+
+    return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
   });
 
   ipcMain.handle('kotamusic:download:folder', () => {

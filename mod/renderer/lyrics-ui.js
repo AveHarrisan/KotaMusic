@@ -203,6 +203,11 @@ function rememberBox(box) {
   if (fullscreen) return;
 
   const rect = box.getBoundingClientRect();
+
+  // Мусорные значения не храним: панель не может быть крохотной
+  // или прижатой к самому краю без участия человека.
+  if (rect.width < MIN_BOX.width || rect.height < MIN_BOX.height) return;
+  if (rect.left < 1 || rect.top < 1) return;
   saved = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
   ipcRenderer.invoke('kotamusic:settings:set', { lyricsPanelBox: saved });
 }
@@ -271,6 +276,29 @@ function buildPanel() {
   source.setAttribute('data-role', 'source');
   source.style.cssText = 'font-size:11px;opacity:.5;white-space:nowrap;margin-right:4px';
 
+  // Ползунок размера шрифта — как громкость: тянешь и сразу видишь.
+  const sizer = document.createElement('input');
+  sizer.type = 'range';
+  sizer.min = '12';
+  sizer.max = '32';
+  sizer.step = '1';
+  sizer.value = String(fontSize());
+  sizer.title = 'Размер шрифта';
+  sizer.style.cssText = 'width:74px;flex:none;accent-color:#ffdb4d;cursor:pointer';
+
+  let saveSoon = null;
+  sizer.addEventListener('input', () => {
+    settings.lyricsFontSize = Number(sizer.value);
+    applyBox(box);
+
+    // Пишем в настройки не на каждое движение, а когда оно улеглось.
+    clearTimeout(saveSoon);
+    saveSoon = setTimeout(
+      () => ipcRenderer.invoke('kotamusic:settings:set', { lyricsFontSize: Number(sizer.value) }),
+      400
+    );
+  });
+
   const reset = headButton('⤢', 'Вернуть размер и место');
   reset.textContent = '⟲';
   reset.addEventListener('click', () => {
@@ -291,7 +319,7 @@ function buildPanel() {
   const close = headButton('✕', 'Закрыть');
   close.addEventListener('click', closePanel);
 
-  head.append(name, source, reset, expand, close);
+  head.append(name, source, sizer, reset, expand, close);
 
   const body = document.createElement('div');
   body.setAttribute('data-role', 'body');
@@ -314,16 +342,9 @@ function buildPanel() {
     }, 500);
   }
 
-  // Растянули за угол — запоминаем новый размер. Первый вызов приходит
-  // сразу при наблюдении, его пропускаем: запоминать там нечего.
-  let first = true;
-  new ResizeObserver(() => {
-    if (first) {
-      first = false;
-      return;
-    }
-    rememberBox(box);
-  }).observe(box);
+  // Размер запоминаем, когда человек отпустил мышь: наблюдатель за
+  // размером срабатывал и на наши же перестроения и сохранял ерунду.
+  box.addEventListener('pointerup', () => setTimeout(() => rememberBox(box), 50));
 
   return box;
 }

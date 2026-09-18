@@ -635,6 +635,11 @@ function fill(container) {
         toggle(config.downloadAlbumFolder, (value) => update({ downloadAlbumFolder: value }))
       ),
       row(
+        'Спрашивать перед каждым скачиванием',
+        'Окно с выбором: в общую папку, в папку альбома или в другую',
+        toggle(config.downloadAsk, (value) => update({ downloadAsk: value }))
+      ),
+      row(
         'Скачивать в MP3',
         'Иначе — в том формате, который отдаёт Яндекс',
         toggle(config.downloadMp3, (value) => update({ downloadMp3: value }))

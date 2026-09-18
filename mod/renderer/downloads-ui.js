@@ -113,83 +113,172 @@ function currentTrack() {
   };
 }
 
+/**
+ * Своё окно с вопросом: клиентские окна нам недоступны, а решение
+ * человека нужно до начала скачивания.
+ */
+function ask(title, text, buttons) {
+  return new Promise((resolve) => {
+    document.querySelector('[data-kotamusic-ask]')?.remove();
+
+    const shade = document.createElement('div');
+    shade.setAttribute('data-kotamusic-ask', '1');
+    shade.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;' +
+      'justify-content:center;background:rgba(0,0,0,.55);-webkit-app-region:no-drag';
+
+    const box = document.createElement('div');
+    box.style.cssText =
+      'min-width:320px;max-width:min(520px,90vw);padding:20px 22px;border-radius:16px;' +
+      'background:#242424;color:#fff;font:14px/1.45 system-ui,sans-serif;' +
+      'box-shadow:0 16px 48px rgba(0,0,0,.6)';
+
+    const head = document.createElement('div');
+    head.style.cssText = 'font-size:16px;font-weight:600;margin-bottom:8px';
+    head.textContent = title;
+
+    const body = document.createElement('div');
+    body.style.cssText = 'opacity:.75;white-space:pre-wrap;word-break:break-word';
+    body.textContent = text;
+
+    const row = document.createElement('div');
+    row.style.cssText =
+      'display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap';
+
+    const finish = (value) => {
+      shade.remove();
+      document.removeEventListener('keydown', onKey, true);
+      resolve(value);
+    };
+
+    function onKey(event) {
+      if (event.key === 'Escape') finish(null);
+      event.stopPropagation();
+    }
+
+    for (const item of buttons) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = item.label;
+      button.style.cssText =
+        'padding:9px 14px;border-radius:10px;cursor:pointer;font:600 13px system-ui,sans-serif;' +
+        (item.main
+          ? 'border:none;background:#ffdb4d;color:#1a1a1a'
+          : 'border:1px solid rgba(255,255,255,.18);background:transparent;color:inherit');
+
+      button.addEventListener('click', () => finish(item.value));
+      row.appendChild(button);
+    }
+
+    box.append(head, body, row);
+    shade.appendChild(box);
+    shade.addEventListener('click', (event) => event.target === shade && finish(null));
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(shade);
+  });
+}
+
+/** «18.09.2026 в 14:12» — когда файл появился. */
+function whenText(at) {
+  const date = new Date(at || Date.now());
+  const two = (value) => String(value).padStart(2, '0');
+
+  return (
+    `${two(date.getDate())}.${two(date.getMonth() + 1)}.${date.getFullYear()} ` +
+    `в ${two(date.getHours())}:${two(date.getMinutes())}`
+  );
+}
+
+/** Куда класть на этот раз: спрашиваем, если человек попросил. */
+async function whereTo(kind) {
+  if (!settings.downloadAsk) return {};
+
+  const buttons =
+    kind === 'track'
+      ? [
+          { label: 'В общую папку', value: {}, main: true },
+          { label: 'Выбрать другую…', value: { pick: true } },
+          { label: 'Отмена', value: null },
+        ]
+      : [
+          { label: 'В папку альбома', value: { ownFolder: true }, main: true },
+          { label: 'В общую папку', value: { ownFolder: false } },
+          { label: 'Выбрать другую…', value: { pick: true } },
+          { label: 'Отмена', value: null },
+        ];
+
+  const choice = await ask(
+    'Куда сохранить?',
+    'Выбор действует только для этого скачивания.',
+    buttons
+  );
+
+  if (!choice) return null;
+
+  if (choice.pick) {
+    const dir = await ipcRenderer.invoke('kotamusic:download:pick');
+    return dir ? { dir, ownFolder: false } : null;
+  }
+
+  return choice;
+}
+
+/** Такой файл уже есть — спрашиваем, качать ли заново. */
+async function askAgain(answer) {
+  const choice = await ask(
+    'Трек уже скачан',
+    `${answer.title}\nФайл создан ${whenText(answer.at)}.\n${answer.file}`,
+    [
+      { label: 'Скачать заново', value: 'again', main: true },
+      { label: 'Отмена', value: null },
+    ]
+  );
+
+  return choice === 'again';
+}
+
+/** Скачивание трека по номеру: с вопросами о папке и о повторе. */
+async function downloadTrackById(trackId) {
+  const where = await whereTo('track');
+  if (!where) return;
+
+  toast('Скачиваю…', { progress: 0 });
+  let result = await ipcRenderer.invoke('kotamusic:download:track', trackId, where);
+
+  if (result?.exists) {
+    if (!(await askAgain(result))) return toast('Оставил как есть');
+
+    toast('Скачиваю заново…', { progress: 0 });
+    result = await ipcRenderer.invoke('kotamusic:download:track', trackId, { ...where, force: true });
+  }
+
+  if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
+}
+
 /** Скачать то, что играет: по номеру, а если его нет — по названию. */
 async function downloadCurrent() {
   const about = currentTrack();
   if (!about?.trackId && !about?.title) return toast('Не понял, какой трек играет');
 
-  toast('Скачиваю…', { progress: 0 });
+  const where = await whereTo('track');
+  if (!where) return;
 
-  const result = about.trackId
-    ? await ipcRenderer.invoke('kotamusic:download:track', about.trackId)
-    : await ipcRenderer.invoke('kotamusic:download:current', about);
+  const run = async (options) =>
+    about.trackId
+      ? ipcRenderer.invoke('kotamusic:download:track', about.trackId, options)
+      : ipcRenderer.invoke('kotamusic:download:current', { track: about, options });
+
+  toast('Скачиваю…', { progress: 0 });
+  let result = await run(where);
+
+  if (result?.exists) {
+    if (!(await askAgain(result))) return toast('Оставил как есть');
+
+    toast('Скачиваю заново…', { progress: 0 });
+    result = await run({ ...where, force: true });
+  }
 
   if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
-}
-
-/** Что лежит под последним нажатием: альбом, плейлист или трек. */
-function targetIds() {
-  let node = lastTarget;
-
-  for (let depth = 0; node && depth < 12; depth += 1) {
-    const link = node.matches?.('a[href]')
-      ? node
-      : node.querySelector?.('a[href*="albumId="],a[href*="/album/"],a[href*="/playlists/"]');
-
-    const ids = idsFrom(link?.getAttribute('href'));
-    if (ids.albumId || ids.owner) return ids;
-
-    node = node.parentElement;
-  }
-
-  return idsFrom(location.pathname + location.search);
-}
-
-/** Короткое сообщение в углу — своё, чтобы не спорить с клиентом. */
-function toast(text, { progress = null, id = 'kotamusic-toast' } = {}) {
-  let box = document.querySelector(`[data-kotamusic-progress="${id}"]`);
-
-  if (!box) {
-    box = document.createElement('div');
-    box.setAttribute('data-kotamusic-progress', id);
-    box.style.cssText =
-      'position:fixed;left:50%;transform:translateX(-50%);bottom:92px;z-index:2147483646;' +
-      'min-width:260px;max-width:min(520px,90vw);padding:10px 14px;border-radius:12px;' +
-      'background:#2a2a2a;color:#fff;font:13px/1.35 system-ui,sans-serif;' +
-      'box-shadow:0 8px 24px rgba(0,0,0,.45);-webkit-app-region:no-drag';
-
-    const label = document.createElement('div');
-    label.setAttribute('data-role', 'label');
-    box.appendChild(label);
-
-    const track = document.createElement('div');
-    track.setAttribute('data-role', 'track');
-    track.style.cssText =
-      'margin-top:8px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden';
-
-    const fill = document.createElement('div');
-    fill.setAttribute('data-role', 'fill');
-    fill.style.cssText = 'height:100%;width:0;background:#ffdb4d;transition:width .2s';
-
-    track.appendChild(fill);
-    box.appendChild(track);
-    document.body.appendChild(box);
-  }
-
-  box.querySelector('[data-role="label"]').textContent = text;
-
-  const track = box.querySelector('[data-role="track"]');
-  const fill = box.querySelector('[data-role="fill"]');
-
-  track.style.display = progress === null ? 'none' : '';
-  if (progress !== null) fill.style.width = `${Math.round(progress * 100)}%`;
-
-  clearTimeout(box.dataset.timer);
-  if (progress === null) {
-    box.dataset.timer = setTimeout(() => box.remove(), 4000);
-  }
-
-  return box;
 }
 
 /** Кнопка в панели плеера — рядом с выбором качества. */
@@ -280,17 +369,26 @@ function addMenuItem({ node, items }, kind) {
     const ids = kind === 'track' ? { trackId: currentMenuTrackId() } : targetIds();
 
     if (kind === 'album' && ids.albumId) {
-      toast('Скачиваю альбом…', { progress: 0 });
-      const result = await ipcRenderer.invoke('kotamusic:download:album', ids.albumId);
-      if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+      const where = await whereTo('album');
+      if (where) {
+        toast('Скачиваю альбом…', { progress: 0 });
+        const result = await ipcRenderer.invoke('kotamusic:download:album', ids.albumId, where);
+        if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+      }
     } else if (kind === 'playlist' && ids.owner && ids.kind) {
-      toast('Скачиваю плейлист…', { progress: 0 });
-      const result = await ipcRenderer.invoke('kotamusic:download:playlist', ids.owner, ids.kind);
-      if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+      const where = await whereTo('playlist');
+      if (where) {
+        toast('Скачиваю плейлист…', { progress: 0 });
+        const result = await ipcRenderer.invoke(
+          'kotamusic:download:playlist',
+          ids.owner,
+          ids.kind,
+          where
+        );
+        if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+      }
     } else if (ids.trackId) {
-      toast('Скачиваю…', { progress: 0 });
-      const result = await ipcRenderer.invoke('kotamusic:download:track', ids.trackId);
-      if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+      await downloadTrackById(ids.trackId);
     } else {
       // Меню «Моей волны» ссылок не содержит — качаем то, что играет.
       await downloadCurrent();
