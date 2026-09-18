@@ -123,30 +123,6 @@ jobs:
           name: app-asar-${{ steps.info.outputs.client }}
           path: dist/
 
-      # Значки описания считаем сами: готовый значок shields складывает
-      # загрузки всех файлов релиза, включая служебные, которые мод и
-      # установщик качают сами.
-      - name: Обновить значки
-        run: |
-          node scripts/badges.js
-
-          if git diff --quiet -- docs/badges; then
-            echo "значки не изменились"
-            exit 0
-          fi
-
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git add docs/badges
-          git commit -m "Значки: свежие числа загрузок и версии"
-          # Пока шла сборка, в ветку могли запушить ещё — подтягиваемся.
-          git pull --rebase
-          git push
-
-      # Выкладываем сами, а не готовым действием: однажды оно удалило
-      # старые файлы, выложило build-info.json и молча упало, не догрузив
-      # app.asar, — релиз остался с новой версией и без самого мода.
-      # Поэтому: сначала мод, отметка о версии последней, и с повторами.
       - name: Выложить релиз
         if: steps.check.outputs.publish == 'true'
         env:
@@ -181,6 +157,35 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[].name' | sort | tee /tmp/assets
           grep -qx 'app.asar' /tmp/assets
           grep -qx 'build-info.json' /tmp/assets
+
+      # Значки описания считаем сами: готовый значок shields складывает
+      # загрузки всех файлов релиза, включая служебные, которые мод и
+      # установщик качают сами.
+      #
+      # ⚠️Шаг стоит ПОСЛЕ выкладки: версию для значка мы читаем из
+      # build-info.json в релизе, и раньше значок отставал ровно на один
+      # выпуск — показывал то, что лежало в релизе до этой сборки.
+      - name: Обновить значки
+        run: |
+          node scripts/badges.js
+
+          if git diff --quiet -- docs/badges; then
+            echo "значки не изменились"
+            exit 0
+          fi
+
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add docs/badges
+          git commit -m "Значки: свежие числа загрузок и версии"
+          # Пока шла сборка, в ветку могли запушить ещё — подтягиваемся.
+          git pull --rebase
+          git push
+
+      # Выкладываем сами, а не готовым действием: однажды оно удалило
+      # старые файлы, выложило build-info.json и молча упало, не догрузив
+      # app.asar, — релиз остался с новой версией и без самого мода.
+      # Поэтому: сначала мод, отметка о версии последней, и с повторами.
 
   # Сборка падает, если врезка не нашла своё место в новом коде клиента.
   # Тогда заводим задачу вместо тихого пропуска обновления.
