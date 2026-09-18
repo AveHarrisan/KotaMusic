@@ -147,6 +147,33 @@ function actionButton(label, onClick) {
   return button;
 }
 
+/**
+ * Кнопка, которая спрашивает сама себя: первое нажатие меняет подпись на
+ * вопрос, второе — делает дело. Проще отдельного окна и так же безопасно.
+ */
+function confirmButton(label, question, onConfirm) {
+  const button = actionButton(label, async () => {
+    if (button.dataset.asked !== '1') {
+      button.dataset.asked = '1';
+      button.textContent = question;
+
+      clearTimeout(button.dataset.timer);
+      button.dataset.timer = setTimeout(() => {
+        button.dataset.asked = '';
+        button.textContent = label;
+      }, 4000);
+
+      return;
+    }
+
+    clearTimeout(button.dataset.timer);
+    button.dataset.asked = '';
+    await onConfirm(button);
+  });
+
+  return button;
+}
+
 // Какие разделы человек раскрыл. Держим на своей стороне и запоминаем:
 // содержимое пересобирается на каждое изменение настройки, и без этого
 // раздел схлопывался бы от щелчка по переключателю внутри него.
@@ -539,6 +566,61 @@ function tracksText(count) {
   return `${count} треков`;
 }
 
+/** Пишет ответ человеку под подписью строки и через время убирает. */
+function say(button, text) {
+  const description = button.parentElement?.querySelector('[data-role="description"]');
+  if (!description) return;
+
+  if (!description.dataset.was) description.dataset.was = description.textContent;
+  description.textContent = text;
+
+  clearTimeout(description.dataset.timer);
+  description.dataset.timer = setTimeout(() => {
+    description.textContent = description.dataset.was || '';
+    description.dataset.was = '';
+  }, 6000);
+}
+
+/** Английские ответы браузера переводим на понятный язык. */
+function reasonText(error) {
+  const name = error?.name || '';
+
+  if (name === 'NotFoundError') return 'Клиент ничего не держит — убирать нечего';
+  if (name === 'NoModificationAllowedError' || name === 'InvalidStateError') {
+    return 'Клиент держит файлы. Закройте его и попробуйте снова';
+  }
+  if (name === 'SecurityError' || name === 'NotAllowedError') {
+    return 'Клиент не дал доступ к своему хранилищу';
+  }
+  if (name === 'QuotaExceededError') return 'На диске нет места для работы';
+
+  return `Не вышло убрать: ${error?.message || 'непонятная беда'}`;
+}
+
+/**
+ * Убирает файлы, которые клиент скачал «на устройство». Он держит их в
+ * хранилище страницы (OPFS), поэтому чистим прямо там.
+ */
+async function clearDownloaded() {
+  if (!navigator.storage?.getDirectory) throw new Error('хранилище клиенту недоступно');
+
+  const root = await navigator.storage.getDirectory();
+
+  try {
+    await root.removeEntry('tracks', { recursive: true });
+    return 'убрано';
+  } catch (e) {
+    // ⚠️Папки нет — значит убирать нечего: человек уже очистил всё сам
+    // через клиент. Это не беда, а готовый ответ.
+    if (e?.name === 'NotFoundError') return 'уже пусто';
+    if (e?.name === 'NoModificationAllowedError') {
+      throw new Error('клиент держит файлы, закройте его и попробуйте снова');
+    }
+
+    throw e;
+  }
+}
+
 /** Строка со сведениями о скачанном в клиенте и размере папки данных. */
 function storageRow() {
   const node = row('Скачано в клиенте', 'Считаю…', el('div', 'flex:none;opacity:.5;font-size:13px', ''));
@@ -739,6 +821,29 @@ function fill(container) {
         actionButton('Вернуть', () => update({ cacheDir: '' }))
       ),
       storageRow(),
+      row(
+        'Очистить скачанное',
+        'Убирает треки, которые клиент держит для прослушивания без интернета. ' +
+          'Файлы, скачанные модом в свою папку, остаются на месте',
+        confirmButton('Очистить', 'Точно убрать?', async (button) => {
+          button.textContent = 'Убираю…';
+
+          try {
+            const how = await clearDownloaded();
+
+            if (how === 'уже пусто') {
+              button.textContent = 'Очистить';
+              say(button, 'Клиент ничего не держит — убирать нечего');
+              return;
+            }
+
+            render();
+          } catch (e) {
+            button.textContent = 'Очистить';
+            say(button, reasonText(e));
+          }
+        })
+      ),
     ])
   );
 
