@@ -21,6 +21,7 @@ function menuKind(id) {
 const MARK = 'data-kotamusic-download';
 
 const ICON_PATH = 'M12 4v11m0 0l-4-4m4 4l4-4M5 19h14';
+const FOLDER_PATH = 'M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z';
 
 /** Стрелка вниз. Рисунок строим узлами: разметкой он бы не появился. */
 function iconNode(size = 20) {
@@ -257,6 +258,36 @@ async function showQuality() {
 }
 
 /** Пункт «Скачать в файл» в открывшемся меню. */
+/** Меняет подпись пункта, не трогая значок рядом с ней. */
+function setLabel(item, text) {
+  const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+  let found = null;
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue.trim()) found = walker.currentNode;
+  }
+
+  if (found) found.nodeValue = text;
+  else item.append(text);
+}
+
+/** Подменяет рисунок значка своим. */
+function setIcon(item, shape) {
+  const picture = item.querySelector('svg');
+  if (!picture) return;
+
+  picture.setAttribute('viewBox', '0 0 24 24');
+  picture.setAttribute('fill', 'none');
+  picture.replaceChildren();
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', shape);
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '2');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  picture.appendChild(path);
+}
+
 function addMenuItem({ node, items }, kind) {
   if (node.querySelector(`[${MARK}-item]`)) return;
 
@@ -271,31 +302,9 @@ function addMenuItem({ node, items }, kind) {
   item.removeAttribute('data-test-id');
 
   // Если за образец взяли не «Скачать», значок у клона чужой — рисуем свой.
-  const picture = /^Скачать/i.test(sample.textContent.trim()) ? null : item.querySelector('svg');
-  if (picture) {
-    picture.setAttribute('viewBox', '0 0 24 24');
-    picture.setAttribute('fill', 'none');
-    picture.replaceChildren();
+  if (!/^Скачать/i.test(sample.textContent.trim())) setIcon(item, ICON_PATH);
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', ICON_PATH);
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '2');
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
-    picture.appendChild(path);
-  }
-
-  // Подпись лежит обычным текстом рядом со значком, поэтому меняем именно
-  // текст: если переписать весь пункт, вместе с подписью пропадёт значок.
-  const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
-  let label = null;
-  while (walker.nextNode()) {
-    if (walker.currentNode.nodeValue.trim()) label = walker.currentNode;
-  }
-
-  if (label) label.nodeValue = 'Скачать в файл';
-  else item.append('Скачать в файл');
+  setLabel(item, 'Скачать в файл');
 
   item.addEventListener('click', async (event) => {
     event.preventDefault();
@@ -325,6 +334,22 @@ function addMenuItem({ node, items }, kind) {
 
   // Ставим последним пунктом, после всех настоящих.
   items[items.length - 1].insertAdjacentElement('afterend', item);
+
+  // Следом — «Открыть папку»: сразу после скачивания это первое,
+  // что хочется сделать.
+  const open = item.cloneNode(true);
+  open.setAttribute(`${MARK}-item`, '1');
+  setLabel(open, 'Открыть папку со скачанным');
+  setIcon(open, FOLDER_PATH);
+
+  open.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    ipcRenderer.invoke('kotamusic:download:folder');
+    document.body.click();
+  });
+
+  item.insertAdjacentElement('afterend', open);
 
 }
 

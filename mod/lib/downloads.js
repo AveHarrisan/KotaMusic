@@ -279,7 +279,12 @@ async function single(trackId) {
 
 /** Скачивание списка треков в свою папку. */
 async function many(tracks, title) {
-  const folder = path.join(targetDir(), safeName(title));
+  // Альбом и плейлист по желанию ложатся в свою папку — так удобнее
+  // искать, — или вперемешку с остальным, одной кучей.
+  const folder = settings.get().downloadAlbumFolder === false
+    ? targetDir()
+    : path.join(targetDir(), safeName(title));
+
   fs.mkdirSync(folder, { recursive: true });
 
   const shares = new Map();

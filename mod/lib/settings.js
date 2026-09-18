@@ -28,6 +28,8 @@ const DEFAULTS = {
   downloadMp3: false,
   downloadLyrics: true,
   downloadCover: true,
+  // Альбом и плейлист складывать в свою папку или всё в общую.
+  downloadAlbumFolder: true,
 
   // Своя папка для данных клиента: кеш и скачанное в самом клиенте.
   cacheDir: '',

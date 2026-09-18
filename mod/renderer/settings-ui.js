@@ -630,6 +630,11 @@ function fill(container) {
         textField(config.downloadDir, (value) => update({ downloadDir: value }))
       ),
       row(
+        'Альбом и плейлист — в свою папку',
+        'Иначе всё складывается в одну общую папку',
+        toggle(config.downloadAlbumFolder, (value) => update({ downloadAlbumFolder: value }))
+      ),
+      row(
         'Скачивать в MP3',
         'Иначе — в том формате, который отдаёт Яндекс',
         toggle(config.downloadMp3, (value) => update({ downloadMp3: value }))
