@@ -377,8 +377,14 @@ function buildQuality() {
   quality.setAttribute(`data-${QUALITY_MARK}`, '1');
   quality.title = 'Качество трека';
 
-  quality.style.cursor = 'pointer';
-  quality.addEventListener('click', openSoundSettings);
+  quality.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Открываем не сразу: клиент закрывает своё меню по нажатию мимо
+    // него, и открытое в тот же миг меню закрылось бы этим же нажатием.
+    setTimeout(openSoundSettings, 150);
+  });
   quality.addEventListener('mouseenter', () => (quality.style.background = 'rgba(255,255,255,.22)'));
   quality.addEventListener('mouseleave', () => (quality.style.background = 'rgba(255,255,255,.1)'));
 
@@ -388,6 +394,7 @@ function buildQuality() {
     'background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);' +
     'font-weight:600;letter-spacing:.02em;white-space:nowrap;-webkit-app-region:no-drag';
 
+  quality.style.cursor = 'pointer';
   document.body.appendChild(quality);
 }
 
@@ -571,7 +578,21 @@ function showHint() {
 function start() {
   // Проверка вёрстки: открыть настройки звука без мыши. Подписываемся
   // сразу, иначе команда придёт раньше, чем мы будем готовы её услышать.
-  ipcRenderer.on('kotamusic:ui:sound', openSoundSettings);
+  // Нажимаем саму подпись, а не зовём открытие напрямую: так проверка
+  // повторяет то, что делает человек мышью.
+  ipcRenderer.on('kotamusic:ui:sound', () => {
+    // Подпись появляется не сразу — ждём её и только потом нажимаем.
+    let tries = 0;
+    const wait = setInterval(() => {
+      tries += 1;
+      if (quality) {
+        clearInterval(wait);
+        quality.click();
+      } else if (tries > 40) {
+        clearInterval(wait);
+      }
+    }, 500);
+  });
 
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
     enabled = state?.values?.miniplayerButton !== false;
