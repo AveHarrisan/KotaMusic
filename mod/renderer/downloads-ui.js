@@ -77,6 +77,54 @@ function currentTrackId() {
   return idsFrom(link?.getAttribute('href')).trackId;
 }
 
+/** Бегущая строка дублирует текст — берём самый короткий повтор. */
+function clean(node) {
+  const value = (node?.textContent || '').trim();
+  if (!value) return '';
+
+  for (let size = 1; size <= value.length / 2; size += 1) {
+    if (value.length % size) continue;
+    const piece = value.slice(0, size);
+    if (piece.repeat(value.length / size) === value) return piece;
+  }
+
+  return value;
+}
+
+/**
+ * Что играет: номер, а если его нет — название с исполнителем.
+ * В «Моей волне» ссылки на трек в панели не бывает вовсе.
+ */
+function currentTrack() {
+  const bar = document.querySelector(BAR);
+  if (!bar) return null;
+
+  const title = clean(bar.querySelector('[data-test-id="TRACK_TITLE"],[data-test-id="VIBE_PLAYERBAR_TRACK_NAME"]'));
+  const artists = [...bar.querySelectorAll('[data-test-id="SEPARATED_ARTIST_TITLE"]')].map(clean);
+  const album = bar.querySelector('a[href*="albumId="],a[href*="/album/"]');
+
+  return {
+    trackId: currentTrackId(),
+    title,
+    artist: artists.filter(Boolean).join(', '),
+    albumId: idsFrom(album?.getAttribute('href')).albumId,
+  };
+}
+
+/** Скачать то, что играет: по номеру, а если его нет — по названию. */
+async function downloadCurrent() {
+  const about = currentTrack();
+  if (!about?.trackId && !about?.title) return toast('Не понял, какой трек играет');
+
+  toast('Скачиваю…', { progress: 0 });
+
+  const result = about.trackId
+    ? await ipcRenderer.invoke('kotamusic:download:track', about.trackId)
+    : await ipcRenderer.invoke('kotamusic:download:current', about);
+
+  if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
+}
+
 /** Что лежит под последним нажатием: альбом, плейлист или трек. */
 function targetIds() {
   let node = lastTarget;
@@ -165,16 +213,10 @@ function buildButton() {
   button.setAttribute('aria-label', 'Скачать трек в файл');
   button.replaceChildren(iconNode());
 
-  button.addEventListener('click', async (event) => {
+  button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-
-    const trackId = currentTrackId();
-    if (!trackId) return toast('Не понял, какой трек играет');
-
-    toast('Скачиваю…', { progress: 0 });
-    const result = await ipcRenderer.invoke('kotamusic:download:track', trackId);
-    if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
+    downloadCurrent();
   });
 
   anchor.parentElement.insertBefore(button, anchor);
@@ -228,6 +270,22 @@ function addMenuItem({ node, items }, kind) {
   item.setAttribute(`${MARK}-item`, '1');
   item.removeAttribute('data-test-id');
 
+  // Если за образец взяли не «Скачать», значок у клона чужой — рисуем свой.
+  const picture = /^Скачать/i.test(sample.textContent.trim()) ? null : item.querySelector('svg');
+  if (picture) {
+    picture.setAttribute('viewBox', '0 0 24 24');
+    picture.setAttribute('fill', 'none');
+    picture.replaceChildren();
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ICON_PATH);
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    picture.appendChild(path);
+  }
+
   // Подпись лежит обычным текстом рядом со значком, поэтому меняем именно
   // текст: если переписать весь пункт, вместе с подписью пропадёт значок.
   const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
@@ -258,7 +316,8 @@ function addMenuItem({ node, items }, kind) {
       const result = await ipcRenderer.invoke('kotamusic:download:track', ids.trackId);
       if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
     } else {
-      toast('Не понял, что скачивать');
+      // Меню «Моей волны» ссылок не содержит — качаем то, что играет.
+      await downloadCurrent();
     }
 
     document.body.click(); // меню закрывается само, как после своих пунктов

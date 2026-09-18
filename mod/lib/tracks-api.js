@@ -189,6 +189,39 @@ async function cover(uri, size = 400) {
   return Buffer.from(await response.arrayBuffer());
 }
 
+/** Поиск трека по названию и исполнителю. */
+async function findTrack({ title, artist, albumId }) {
+  // Если известен альбом — ищем среди его треков: это точнее поиска.
+  if (albumId) {
+    try {
+      const { tracks } = await albumTracks(albumId);
+      const same = tracks.find(
+        (track) => String(track.title || '').toLowerCase() === String(title || '').toLowerCase()
+      );
+      if (same) return same;
+    } catch (e) {
+      log.debug('Альбом не прочитался:', e.message);
+    }
+  }
+
+  if (!title) return null;
+
+  const params = new URLSearchParams({
+    type: 'track',
+    page: '0',
+    nocorrect: 'false',
+    text: [artist, title].filter(Boolean).join(' '),
+  });
+
+  const found = await request(`search?${params}`);
+  const results = found?.tracks?.results || [];
+
+  const wanted = String(title).toLowerCase();
+  return (
+    results.find((track) => String(track.title || '').toLowerCase() === wanted) || results[0] || null
+  );
+}
+
 /** Треки альбома по порядку. */
 async function albumTracks(albumId) {
   const album = await request(`albums/${albumId}/with-tracks`);
@@ -262,6 +295,7 @@ module.exports = {
   getToken,
   forgetToken,
   tracksMeta,
+  findTrack,
   playlists,
   myUid,
   fileInfo,

@@ -393,6 +393,24 @@ function start() {
     })
   );
 
+  // В «Моей волне» ссылки на трек нет вовсе, поэтому туда приходят
+  // название с исполнителем — трек находим сами.
+  ipcMain.handle('kotamusic:download:current', async (_event, about) =>
+    enqueue(async () => {
+      try {
+        const track = await api.findTrack(about || {});
+        if (!track?.id) throw new Error('Не нашёл этот трек в Яндекс Музыке');
+
+        const file = await single(track.id);
+        return { ok: true, file };
+      } catch (e) {
+        log.warn('Скачивание не удалось:', e.message);
+        notice.show(`Не удалось скачать трек: ${e.message}`);
+        return { ok: false, error: e.message };
+      }
+    })
+  );
+
   ipcMain.handle('kotamusic:download:album', async (_event, albumId) =>
     enqueue(async () => {
       try {
