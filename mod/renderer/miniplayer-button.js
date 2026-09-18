@@ -198,7 +198,7 @@ function place() {
 
     for (const node of [button, lock, updater, quality]) {
       if (!node) continue;
-      node.style.bottom = `${bottom}px`;
+      node.style.bottom = `${liftValue || bottom}px`;
       node.style.height = '22px';
       node.style.borderRadius = '11px';
       node.style.font = '';
@@ -218,7 +218,7 @@ function place() {
 
   for (const node of [button, lock, updater, quality]) {
     if (!node) continue;
-    node.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
+    node.style.bottom = `${liftValue || Math.round(window.innerHeight - rect.bottom)}px`;
     node.style.height = `${height}px`;
 
     // Скругление как у плашки, но не меньше полной «таблетки».
@@ -403,6 +403,44 @@ function buildQuality() {
  * кнопка, а в «Моей волне» — только пункт в меню, поэтому там открываем
  * меню и нажимаем нужный пункт.
  */
+let liftValue = 0; // на сколько ряд поднят над окном клиента
+
+/**
+ * Окна клиента — например «Настройки звука» — выезжают снизу и накрывают
+ * наш ряд. Тогда поднимаем ряд над окном: кнопки должны быть видны.
+ */
+function liftAboveDialogs() {
+  const nodes = [button, lock, updater, quality].filter(Boolean);
+  if (!nodes.length) return;
+
+  const row = nodes[0].getBoundingClientRect();
+  let lift = 0;
+
+  for (const node of document.querySelectorAll('div,section,aside')) {
+    if (nodes.includes(node)) continue;
+
+    const rect = node.getBoundingClientRect();
+    if (rect.height < 150 || rect.width < 200) continue;
+    if (rect.height > window.innerHeight * 0.9 || rect.width > window.innerWidth * 0.9) continue;
+
+    const style = getComputedStyle(node);
+    if (style.position !== 'fixed' && style.position !== 'absolute') continue;
+    if (!visible(node)) continue;
+
+    if (rect.bottom < row.top || rect.top > row.bottom) continue;
+    if (rect.right < row.left || rect.left > row.right) continue;
+
+    lift = Math.max(lift, Math.round(window.innerHeight - rect.top + 8));
+  }
+
+  // Пересобираем ряд, только когда высота подъёма и правда изменилась:
+  // иначе он прыгал бы между своим местом и поднятым.
+  if (lift !== liftValue) {
+    liftValue = lift;
+    place();
+  }
+}
+
 /**
  * Нажатие как настоящее: клиент слушает не только click, но и события
  * указателя, и на голый click иногда не отзывается.
@@ -433,15 +471,38 @@ function openSoundSettings() {
   const own = document.querySelector('[data-test-id="SOUND_QUALITY_BUTTON"]');
   if (own) return press(own);
 
-  // В «Моей волне» такой кнопки нет: настройки звука там живут в меню.
-  // Открываем его — дальше человек выбирает сам. Нажимать пункт за него
-  // мы не беремся: меню перерисовывается, и клик уходил в пустоту.
+  // В «Моей волне» такой кнопки нет: настройки звука живут в меню.
+  // Открываем его и сами нажимаем нужный пункт.
   const bar = document.querySelector(PLAYERBAR);
   const opener =
     bar?.querySelector('[data-test-id$="CONTEXT_MENU_BUTTON"]') ||
     bar?.parentElement?.querySelector('[data-test-id$="CONTEXT_MENU_BUTTON"]');
 
-  if (opener) press(opener);
+  if (!opener) return;
+
+  press(opener);
+
+  // Меню рисуется не мгновенно и успевает перерисоваться, поэтому
+  // ждём именно видимый пункт: у скрытых двойников размер нулевой,
+  // и нажатие по ним открывало окно за краем экрана.
+  let tries = 0;
+  const look = setInterval(() => {
+    tries += 1;
+
+    const item = [...document.querySelectorAll('button,[role="menuitem"],[role="menuitemcheckbox"]')]
+      .filter((node) => /Настройки звука/i.test(node.textContent || ''))
+      .find((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 60 && rect.height > 20 && rect.height < 80;
+      });
+
+    if (item) {
+      clearInterval(look);
+      press(item);
+    } else if (tries > 40) {
+      clearInterval(look);
+    }
+  }, 50);
 }
 
 /** Бегущая строка дублирует текст — берём самый короткий повтор. */
@@ -655,7 +716,10 @@ function start() {
 
       // Регулятор появляется без изменений в разметке (только стили),
       // поэтому проверяем его и по времени.
-      setInterval(dodgeVolume, 300);
+      setInterval(() => {
+        dodgeVolume();
+        liftAboveDialogs();
+      }, 300);
 
 
     }, 200);
