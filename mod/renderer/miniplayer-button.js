@@ -156,10 +156,17 @@ function overlaps(a, b, gap = 6) {
   );
 }
 
-/** Прячет кнопки, если регулятор громкости накрыл их. */
+// Своя панель с текстом песни встаёт поверх страницы и тоже может накрыть
+// наши кнопки — особенно во весь экран.
+const LYRICS_PANEL = '[data-kotamusic-lyrics-panel]';
+
+/** Прячет кнопки, если их накрыл регулятор громкости или панель текста. */
 function dodgeVolume() {
-  const nodes = [button, lock, updater].filter(Boolean);
+  const nodes = [button, lock, updater, quality].filter(Boolean);
   if (!nodes.length) return;
+
+  const panel = document.querySelector(LYRICS_PANEL);
+  const panelRect = panel && visible(panel) ? panel.getBoundingClientRect() : null;
 
   const slider = document.querySelector(VOLUME);
   const rect = slider?.getBoundingClientRect();
@@ -171,7 +178,10 @@ function dodgeVolume() {
     rect && rect.width > 0 && rect.height > rect.width && visible(slider);
 
   for (const node of nodes) {
-    const hide = popup && overlaps(node.getBoundingClientRect(), rect);
+    const where = node.getBoundingClientRect();
+    const hide =
+      (popup && overlaps(where, rect)) || (panelRect && overlaps(where, panelRect));
+
     node.style.visibility = hide ? 'hidden' : '';
   }
 }
