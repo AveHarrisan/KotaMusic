@@ -432,14 +432,16 @@ function row(title, description, control) {
   texts.appendChild(el('div', 'font-size:15px;font-weight:500', title));
   if (description) {
     const warning = description.includes('занято');
-    texts.appendChild(
-      el(
-        'div',
-        'font-size:13px;margin-top:2px;line-height:1.3;' +
-          (warning ? 'color:#ff8a80' : 'opacity:.6'),
-        description
-      )
+    const node = el(
+      'div',
+      'font-size:13px;margin-top:2px;line-height:1.3;' + (warning ? 'color:#ff8a80' : 'opacity:.6'),
+      description
     );
+
+    // Подпись иногда дописывается позже — например, когда посчитается
+    // размер папки. Помечаем её, чтобы найти потом.
+    node.setAttribute('data-role', 'description');
+    texts.appendChild(node);
   }
 
   wrap.append(texts, control);
@@ -452,6 +454,94 @@ async function update(patch) {
 }
 
 /** Собирает содержимое раздела заново — проще, чем обновлять по кусочкам. */
+/**
+ * Сколько скачано в самом клиенте. Клиент держит треки в хранилище
+ * страницы (OPFS), поэтому считаем их обходом этой же папки.
+ */
+async function downloadedTracks() {
+  if (!navigator.storage?.getDirectory) return null;
+
+  const count = async (dir) => {
+    let tracks = 0;
+    let size = 0;
+
+    for await (const entry of dir.values()) {
+      if (entry.kind === 'directory') {
+        const inner = await count(entry);
+        tracks += inner.tracks;
+        size += inner.size;
+        continue;
+      }
+
+      // .crswap — недописанные куски, их не считаем.
+      if (entry.name.endsWith('.crswap')) continue;
+
+      try {
+        size += (await entry.getFile()).size;
+        tracks += 1;
+      } catch {
+        /* файл занят клиентом */
+      }
+    }
+
+    return { tracks, size };
+  };
+
+  const root = await navigator.storage.getDirectory();
+
+  for await (const entry of root.values()) {
+    if (entry.kind === 'directory' && entry.name === 'tracks') return count(entry);
+  }
+
+  return { tracks: 0, size: 0 };
+}
+
+function sizeText(bytes) {
+  const units = ['Б', 'КБ', 'МБ', 'ГБ'];
+  let value = Number(bytes) || 0;
+  let unit = 0;
+
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+
+  return `${value.toFixed(value >= 100 || unit === 0 ? 0 : 2)} ${units[unit]}`;
+}
+
+/** Число треков словами: 1 трек, 2 трека, 5 треков. */
+function tracksText(count) {
+  const tail = count % 100;
+  if (tail > 10 && tail < 20) return `${count} треков`;
+
+  const last = count % 10;
+  if (last === 1) return `${count} трек`;
+  if (last >= 2 && last <= 4) return `${count} трека`;
+  return `${count} треков`;
+}
+
+/** Строка со сведениями о скачанном в клиенте и размере папки данных. */
+function storageRow() {
+  const node = row('Скачано в клиенте', 'Считаю…', el('div', 'flex:none;opacity:.5;font-size:13px', ''));
+  const description = node.querySelector('[data-role="description"]');
+
+  Promise.all([downloadedTracks(), ipcRenderer.invoke('kotamusic:cache:info')])
+    .then(([tracks, cache]) => {
+      if (!description) return;
+
+      const parts = [];
+      if (tracks) parts.push(`${tracksText(tracks.tracks)} (${sizeText(tracks.size)})`);
+      if (cache?.size) parts.push(`вся папка данных — ${sizeText(cache.size)}`);
+
+      description.textContent = parts.join(', ') || 'Ничего не скачано';
+    })
+    .catch(() => {
+      if (description) description.textContent = 'Посчитать не вышло';
+    });
+
+  return node;
+}
+
 function fill(container) {
   container.textContent = '';
 
@@ -509,6 +599,94 @@ function fill(container) {
         'Третьей строкой статуса вместо надписи «Яндекс Музыка»',
         toggle(config.showAlbum, (value) => update({ showAlbum: value }))
       ),
+    ])
+  );
+
+  // --- Скачивание треков -------------------------------------------------
+
+  add(
+    section('Скачивание треков', [
+      row(
+        'Кнопка «Скачать» в панели плеера',
+        'Скачивает то, что играет, обычным файлом',
+        toggle(config.downloadButton, (value) => update({ downloadButton: value }))
+      ),
+      row(
+        'Качество трека в панели',
+        'Подпись рядом с кнопкой качества: «HQ+: FLAC»',
+        toggle(config.showTrackQuality, (value) => update({ showTrackQuality: value }))
+      ),
+      row(
+        'Куда складывать',
+        config.downloadDir || 'По умолчанию: папка «Музыка» → YandexMusic',
+        actionButton('Обзор', async () => {
+          const chosen = await ipcRenderer.invoke('kotamusic:download:choose-dir');
+          if (chosen) render();
+        })
+      ),
+      row(
+        'Своя папка',
+        'Можно указать путь руками',
+        textField(config.downloadDir, (value) => update({ downloadDir: value }))
+      ),
+      row(
+        'Скачивать в MP3',
+        'Иначе — в том формате, который отдаёт Яндекс',
+        toggle(config.downloadMp3, (value) => update({ downloadMp3: value }))
+      ),
+      row(
+        'Обложка и подписи в файле',
+        'Название, исполнитель, альбом и картинка внутри самого файла',
+        toggle(config.downloadCover, (value) => update({ downloadCover: value }))
+      ),
+      row(
+        'Текст песни рядом с файлом',
+        'Синхронный текст сохраняется файлом .lrc',
+        toggle(config.downloadLyrics, (value) => update({ downloadLyrics: value }))
+      ),
+      row(
+        'Открыть папку',
+        'Показать скачанные файлы',
+        actionButton('Открыть', () => ipcRenderer.invoke('kotamusic:download:folder'))
+      ),
+    ])
+  );
+
+  // --- Текст песни -------------------------------------------------------
+
+  add(
+    section('Текст песни', [
+      row(
+        'Кнопка текста в панели плеера',
+        'Своя панель: строка подсвечивается по времени',
+        toggle(config.lyricsButton, (value) => update({ lyricsButton: value }))
+      ),
+      row(
+        'Искать в LRCLib',
+        'Открытая база текстов — когда у Яндекса текста нет',
+        toggle(config.lyricsLrclib, (value) => update({ lyricsLrclib: value }))
+      ),
+    ])
+  );
+
+  // --- Память и кеш ------------------------------------------------------
+
+  add(
+    section('Память и кеш', [
+      row(
+        'Папка данных клиента',
+        config.cacheDir || 'По умолчанию — рядом с настройками клиента на системном диске',
+        actionButton('Обзор', async () => {
+          const chosen = await ipcRenderer.invoke('kotamusic:cache:choose');
+          if (chosen) render();
+        })
+      ),
+      row(
+        'Вернуть на системный диск',
+        'Данные переедут обратно при следующем запуске',
+        actionButton('Вернуть', () => update({ cacheDir: '' }))
+      ),
+      storageRow(),
     ])
   );
 

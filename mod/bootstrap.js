@@ -19,6 +19,9 @@ try {
   globalThis.__kotamusicHoldUpdates =
     require('./lib/settings').get().holdClientUpdates !== false;
 
+  // Папку данных клиента Electron принимает только до готовности.
+  require('./lib/storage').applyPath();
+
   // Аппаратное ускорение выключается только до готовности приложения.
   require('./lib/window').applyHardwareAcceleration();
 
@@ -44,6 +47,9 @@ try {
     'window',
     'restart',
     'updates',
+    'downloads',
+    'storage',
+    'lyrics',
   ]) {
     startPart(name);
   }

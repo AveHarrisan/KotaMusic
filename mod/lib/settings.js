@@ -23,6 +23,22 @@ const DEFAULTS = {
   pauseClearSeconds: 0,
   discordApplicationId: branding.discord.applicationId,
 
+  // Скачивание треков в обычные файлы.
+  downloadDir: '',
+  downloadMp3: false,
+  downloadLyrics: true,
+  downloadCover: true,
+
+  // Своя папка для данных клиента: кеш и скачанное в самом клиенте.
+  cacheDir: '',
+
+  // Текст песни: своя панель и запасной источник LRCLib.
+  lyricsButton: true,
+  lyricsLrclib: true,
+  // Кнопка скачивания в панели плеера и подпись с качеством трека.
+  downloadButton: true,
+  showTrackQuality: true,
+
   // Мини-плеер поверх других окон.
   miniplayer: false,
 
@@ -205,8 +221,6 @@ function load() {
   delete values.streamLight;
   delete values.miniplayerHotkey;
   delete values.useLibrary;
-  // Папку кеша клиент задаёт себе сам — настройка ничего не меняла.
-  delete values.cacheDir;
   delete values.bisect;
 
   // Диагностический набор от 10.09 гасил название трека в списке

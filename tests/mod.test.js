@@ -217,3 +217,17 @@ test('все настройки мода видны в окне настроек
   const missing = keys.filter((key) => !hidden.has(key) && !ui.includes(key));
   assert.deepStrictEqual(missing, [], `настройки есть, а переключателей нет: ${missing}`);
 });
+
+test('скорость скачивания пишется привычными единицами', () => {
+  // Берём обе функции разом: счётчик и подпись работают в паре.
+  const source = extract('mod/lib/downloads.js', 'addBytes') + extract('mod/lib/downloads.js', 'speedText');
+  const made = new Function(
+    `const speed = { bytes: 0, since: Date.now() - 1000, value: 0 };${source};return { addBytes, speedText }`
+  )();
+
+  // Пока ничего не качали, писать нечего.
+  assert.strictEqual(made.speedText(), '');
+
+  made.addBytes(5 * 1024 * 1024);
+  assert.match(made.speedText(), /^\d+([.,]\d)? (Б|КБ|МБ)\/с$/);
+});

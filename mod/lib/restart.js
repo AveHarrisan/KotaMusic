@@ -18,6 +18,7 @@ const NEEDS_RESTART = {
   ynisonRemote: 'Управление этим компьютером с других устройств',
   hardwareAcceleration: 'Аппаратное ускорение',
   startupPage: 'Стартовая страница',
+  cacheDir: 'Папка данных клиента',
 };
 
 let asking = false;
