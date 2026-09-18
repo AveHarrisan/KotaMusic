@@ -440,6 +440,7 @@ function start() {
   selfTest();
 
   // Проверка вёрстки без мыши: окно само откроет настройки звука.
+
   if (process.env.KOTAMUSIC_UI_TEST === 'sound') {
     // Окно клиента появляется не сразу, поэтому пробуем несколько раз.
     let left = 6;
@@ -535,8 +536,9 @@ function start() {
     // Из панели приходит номер трека, а из «Моей волны» — название:
     // там ссылки на трек нет вовсе.
     let trackId = typeof about === 'object' ? about?.trackId : about;
-    const key = trackId || (typeof about === 'object' ? `${about?.artist} — ${about?.title}` : null);
-    if (!key) return null;
+    const wanted = typeof about === 'object' ? about?.quality : null;
+    const key = `${trackId || (typeof about === 'object' ? `${about?.artist} — ${about?.title}` : '')}|${wanted || ''}`;
+    if (key === '|') return null;
     if (quality.has(key)) return quality.get(key);
 
     try {
@@ -547,7 +549,7 @@ function start() {
 
       if (!trackId) return null;
 
-      const info = await api.fileInfo(trackId);
+      const info = await api.fileInfo(trackId, { quality: wanted });
       const codec = api.CODEC_LABEL[info?.codec] || String(info?.codec || '').toUpperCase();
       const mark = api.QUALITY_LABEL[info?.quality] || (codec === 'FLAC' ? 'HQ+' : '');
       const bitrate = Number(info?.bitrate) || 0;

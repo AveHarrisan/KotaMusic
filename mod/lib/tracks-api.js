@@ -113,10 +113,17 @@ async function tracksMeta(ids) {
 const ts = () => Math.floor(Date.now() / 1000);
 
 /** Ссылка на файл одного трека. */
-async function fileInfo(trackId, { mp3 = false } = {}) {
+async function fileInfo(trackId, { mp3 = false, quality: wanted = null } = {}) {
   const codecs = mp3 ? ['mp3'] : CODECS;
   const stamp = ts();
-  const quality = mp3 ? 'nq' : 'lossless';
+
+  // Качество: либо выбранное человеком в клиенте, либо лучшее из
+  // доступного — для скачивания нам нужно именно оно. В клиенте выбор
+  // называется своими словами, у API — своими.
+  const named = { high_quality: 'lossless', balanced: 'nq', efficient: 'lq', preview: 'lq' };
+  const known = ['lossless', 'hq', 'nq', 'lq'];
+  const asked = named[wanted] || (known.includes(wanted) ? wanted : null);
+  const quality = mp3 ? 'nq' : asked || 'lossless';
 
   const params = new URLSearchParams({
     trackId: String(trackId),

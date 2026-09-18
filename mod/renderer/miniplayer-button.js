@@ -81,6 +81,7 @@ let lock = null;
 let updater = null;
 let quality = null;
 let enabledQuality = true;
+let settings = {};
 let locked = false;
 
 /**
@@ -515,11 +516,20 @@ function playingTrack() {
   const album = bar.querySelector('a[href*="albumId="],a[href*="/album/"]');
   const href = link?.getAttribute('href') || '';
 
+  // Выбранное качество клиент держит у себя в хранилище страницы.
+  let quality = null;
+  try {
+    quality = JSON.parse(localStorage.getItem('ymPlayerQuality'));
+  } catch {
+    quality = localStorage.getItem('ymPlayerQuality');
+  }
+
   return {
     trackId: /trackId=(\d+)/.exec(href)?.[1] || /\/track\/(\d+)/.exec(href)?.[1] || null,
     title,
     artist: artists.filter(Boolean).join(', '),
     albumId: /albumId=(\d+)/.exec(album?.getAttribute('href') || '')?.[1] || null,
+    quality: typeof quality === 'string' ? quality : quality?.value || null,
   };
 }
 
@@ -528,7 +538,11 @@ async function showQuality() {
   if (!quality) return;
 
   const track = enabledQuality ? playingTrack() : null;
-  const key = track ? track.trackId || `${track.artist} — ${track.title}` : null;
+  // Качество входит в ключ: человек меняет его на лету, и подпись
+  // должна меняться следом.
+  const key = track
+    ? `${track.trackId || `${track.artist} — ${track.title}`}|${track.quality || ''}`
+    : null;
 
   if (!key) {
     quality.style.display = 'none';
@@ -539,6 +553,7 @@ async function showQuality() {
 
   if (quality.dataset.track === key) return;
   quality.dataset.track = key;
+
 
   const info = await ipcRenderer.invoke('kotamusic:track:quality', track);
   if (quality.dataset.track !== key) return;
@@ -622,6 +637,7 @@ function start() {
   // сразу, иначе команда придёт раньше, чем мы будем готовы её услышать.
   // Нажимаем саму подпись, а не зовём открытие напрямую: так проверка
   // повторяет то, что делает человек мышью.
+
   ipcRenderer.on('kotamusic:ui:sound', () => {
     // Подпись появляется не сразу — ждём её и только потом нажимаем.
     let tries = 0;
@@ -637,6 +653,7 @@ function start() {
   });
 
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
+    settings = state?.values || {};
     enabled = state?.values?.miniplayerButton !== false;
     enabledQuality = state?.values?.showTrackQuality !== false;
     if (!enabled) return;
