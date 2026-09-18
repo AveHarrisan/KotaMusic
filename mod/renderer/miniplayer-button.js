@@ -396,42 +396,45 @@ function buildQuality() {
  * кнопка, а в «Моей волне» — только пункт в меню, поэтому там открываем
  * меню и нажимаем нужный пункт.
  */
-function openSoundSettings() {
-  const own = document.querySelector('[data-test-id="SOUND_QUALITY_BUTTON"]');
-  if (own) return own.click();
+/**
+ * Нажатие как настоящее: клиент слушает не только click, но и события
+ * указателя, и на голый click иногда не отзывается.
+ */
+function press(node) {
+  const rect = node.getBoundingClientRect();
+  const where = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    clientX: Math.round(rect.left + rect.width / 2),
+    clientY: Math.round(rect.top + rect.height / 2),
+    button: 0,
+    pointerId: 1,
+    pointerType: 'mouse',
+    isPrimary: true,
+  };
 
-  // Ищем «…» только в панели плеера: такие же кнопки есть у карточек
-  // на странице, и нажатие ушло бы не туда.
+  node.dispatchEvent(new PointerEvent('pointerdown', where));
+  node.dispatchEvent(new MouseEvent('mousedown', where));
+  node.dispatchEvent(new PointerEvent('pointerup', where));
+  node.dispatchEvent(new MouseEvent('mouseup', where));
+  node.dispatchEvent(new MouseEvent('click', where));
+}
+
+function openSoundSettings() {
+  // В обычной панели у клиента для этого есть своя кнопка.
+  const own = document.querySelector('[data-test-id="SOUND_QUALITY_BUTTON"]');
+  if (own) return press(own);
+
+  // В «Моей волне» такой кнопки нет: настройки звука там живут в меню.
+  // Открываем его — дальше человек выбирает сам. Нажимать пункт за него
+  // мы не беремся: меню перерисовывается, и клик уходил в пустоту.
   const bar = document.querySelector(PLAYERBAR);
   const opener =
     bar?.querySelector('[data-test-id$="CONTEXT_MENU_BUTTON"]') ||
     bar?.parentElement?.querySelector('[data-test-id$="CONTEXT_MENU_BUTTON"]');
 
-  if (!opener) return;
-
-  opener.click();
-
-  // Меню рисуется не мгновенно — ждём и ищем в нём нужный пункт.
-  let tries = 0;
-  const look = setInterval(() => {
-    tries += 1;
-
-    const item = [...document.querySelectorAll('button,[role="menuitem"]')].find((node) => {
-      if (!/Настройки звука/i.test(node.textContent || '')) return false;
-
-      // Пункт должен быть видимым и небольшим: такой же текст встречается
-      // и в скрытых кусках разметки, нажатие по ним ничего не даёт.
-      const rect = node.getBoundingClientRect();
-      return rect.width > 60 && rect.height > 20 && rect.height < 70;
-    });
-
-    if (item) {
-      clearInterval(look);
-      item.click();
-    } else if (tries > 20) {
-      clearInterval(look);
-    }
-  }, 50);
+  if (opener) press(opener);
 }
 
 /** Бегущая строка дублирует текст — берём самый короткий повтор. */
@@ -632,6 +635,7 @@ function start() {
       // Регулятор появляется без изменений в разметке (только стили),
       // поэтому проверяем его и по времени.
       setInterval(dodgeVolume, 300);
+
 
     }, 200);
   });

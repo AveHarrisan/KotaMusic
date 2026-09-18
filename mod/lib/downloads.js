@@ -441,11 +441,20 @@ function start() {
 
   // Проверка вёрстки без мыши: окно само откроет настройки звука.
   if (process.env.KOTAMUSIC_UI_TEST === 'sound') {
-    setTimeout(() => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send('kotamusic:ui:sound');
+    // Окно клиента появляется не сразу, поэтому пробуем несколько раз.
+    let left = 6;
+    const timer = setInterval(() => {
+      const windows = BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed());
+      left -= 1;
+
+      if (windows.length) {
+        for (const window of windows) window.webContents.send('kotamusic:ui:sound');
+        clearInterval(timer);
+        return;
       }
-    }, 9000);
+
+      if (left <= 0) clearInterval(timer);
+    }, 3000);
   }
 
   ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) =>
