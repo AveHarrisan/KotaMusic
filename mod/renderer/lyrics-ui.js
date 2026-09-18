@@ -215,7 +215,10 @@ function rememberBox(box) {
 /** Перетаскивание за заголовок. */
 function makeDraggable(box, handle) {
   handle.addEventListener('pointerdown', (event) => {
-    if (fullscreen || event.target.closest('button')) return;
+    // ⚠️Ползунок размера шрифта живёт в той же шапке. Без этой проверки
+    // нажатие на него уводило панель в перетаскивание, и ползунок не
+    // двигался вовсе — особенно заметно на узкой панели, где он маленький.
+    if (fullscreen || event.target.closest('button, input, [data-role="sizer"]')) return;
 
     const rect = box.getBoundingClientRect();
     const shiftX = event.clientX - rect.left;
@@ -278,6 +281,7 @@ function buildPanel() {
 
   // Ползунок размера шрифта — как громкость: тянешь и сразу видишь.
   const sizer = document.createElement('input');
+  sizer.setAttribute('data-role', 'sizer');
   sizer.type = 'range';
   sizer.min = '12';
   sizer.max = '32';
