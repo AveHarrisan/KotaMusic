@@ -34,11 +34,30 @@ function sections(text) {
  * Правки нужной версии. Раздел ищем по номеру в начале заголовка, чтобы
  * дата рядом с ним ничему не мешала.
  */
+function sameOrInside(title, version) {
+  const head = title.split(/\s|—/)[0];
+  if (head === String(version)) return true;
+
+  // Несколько версий подряд бывает удобнее описать одним разделом:
+  // «1.2.8–1.2.16». Тогда подходит любая версия из промежутка.
+  const range = head.split(/[–-]/);
+  if (range.length !== 2) return false;
+
+  const number = (value) =>
+    String(value)
+      .split('.')
+      .map((part) => Number(part) || 0)
+      .reduce((total, part) => total * 1000 + part, 0);
+
+  const asked = number(version);
+  return asked >= number(range[0]) && asked <= number(range[1]);
+}
+
 function notesFor(version) {
   if (!fs.existsSync(FILE)) return '';
 
   const text = fs.readFileSync(FILE, 'utf8');
-  const section = sections(text).find((s) => s.title.split(/\s|—/)[0] === String(version));
+  const section = sections(text).find((s) => sameOrInside(s.title, version));
 
   if (!section) return '';
 
