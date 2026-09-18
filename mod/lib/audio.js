@@ -236,7 +236,7 @@ function id3Text(id, value) {
 function withId3(buffer, { tags = {}, cover = null, lyrics = null } = {}) {
   const frames = [];
 
-  const map = { TIT2: tags.TITLE, TPE1: tags.ARTIST, TALB: tags.ALBUM, TYER: tags.DATE, TCON: tags.GENRE };
+  const map = { TIT2: tags.TITLE, TPE1: tags.ARTIST, TALB: tags.ALBUM, TYER: tags.DATE, TCON: tags.GENRE, TRCK: tags.TRACKNUMBER };
   for (const [id, value] of Object.entries(map)) {
     if (value) frames.push(id3Text(id, String(value)));
   }

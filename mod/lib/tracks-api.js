@@ -283,6 +283,22 @@ async function playlistTracks(owner, kind) {
   return { title: playlist?.title || 'Плейлист', tracks };
 }
 
+/**
+ * Плейлист по опознавателю из клиента: с 5.120 страницы плейлистов
+ * открываются по `playlistUuid`, а не по паре «владелец и номер».
+ */
+async function playlistByUuid(uuid) {
+  const playlist = await request(`playlist/${uuid}`);
+  const items = playlist?.tracks || [];
+
+  const ready = items.map((item) => item.track || item).filter((item) => item?.id && item?.title);
+  if (ready.length) return { title: playlist?.title || 'Плейлист', tracks: ready };
+
+  const ids = items.map((item) => item.id || item.trackId).filter(Boolean);
+  const tracks = ids.length ? await tracksMeta(ids.map(String)) : [];
+  return { title: playlist?.title || 'Плейлист', tracks };
+}
+
 // Метки качества и кодека — такие же, какими их называет сам клиент.
 const QUALITY_LABEL = { lq: 'LQ', nq: 'NQ', hq: 'HQ', lossless: 'HQ+' };
 const CODEC_LABEL = {
@@ -311,4 +327,5 @@ module.exports = {
   cover,
   albumTracks,
   playlistTracks,
+  playlistByUuid,
 };

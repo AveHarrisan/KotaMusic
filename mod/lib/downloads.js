@@ -411,7 +411,10 @@ function selfTest() {
       if (id.startsWith('playlist:')) {
         const [owner, kind] = id.slice('playlist:'.length).split(':');
         log.info('Проверка скачивания, плейлист', owner, kind);
-        const { title, tracks } = await api.playlistTracks(owner, kind);
+        const { title, tracks } =
+          owner === 'uuid'
+            ? await api.playlistByUuid(kind)
+            : await api.playlistTracks(owner, kind);
         log.info(`Проверка: в плейлисте «${title}» ${tracks.length} треков`);
         log.info('Проверка: готово', JSON.stringify(await many(tracks.slice(0, 2), title)));
         return;
@@ -519,7 +522,10 @@ function start() {
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
-        const { title, tracks } = await api.playlistTracks(owner, kind);
+        const { title, tracks } =
+          owner === 'uuid'
+            ? await api.playlistByUuid(kind)
+            : await api.playlistTracks(owner, kind);
         const result = await many(tracks, title || 'Плейлист', options);
         return { ok: true, ...result };
       } catch (e) {
