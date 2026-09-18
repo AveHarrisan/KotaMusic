@@ -304,6 +304,71 @@ async function downloadCurrent() {
   if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
 }
 
+/** Скачивание ходовых треков исполнителя — с вопросом перед началом. */
+async function downloadArtist(artistId = null) {
+  const who = artistId || artistFromPage();
+  if (!who) return toast('Не понял, чьи треки скачивать');
+
+  const about = await ipcRenderer.invoke('kotamusic:artist:count', who);
+  if (about?.error) return toast(`Не вышло: ${about.error}`);
+
+  const yes = await ask(
+    'Скачать треки исполнителя?',
+    `${about.title}: ходовых треков — ${about.count}. Пойдут в файлы, как альбом.`,
+    [
+      { label: 'Скачать', value: true, main: true },
+      { label: 'Отмена', value: null },
+    ]
+  );
+
+  if (!yes) return;
+
+  const where = await whereTo('album');
+  if (!where) return;
+
+  toast('Собираю треки исполнителя…', { progress: 0, actions: stopAction() });
+  const result = await ipcRenderer.invoke('kotamusic:download:artist', who, where);
+  if (!result?.ok && !result?.stopped) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+}
+
+/**
+ * Кнопка скачивания в шапке исполнителя: своей у клиента там нет вовсе,
+ * а скачать ходовые треки хочется одним нажатием, не открывая меню.
+ */
+function buildArtistButton() {
+  const head = document.querySelector('[data-test-id="ENTITY_HEADER"]');
+  const menu = head?.querySelector('[data-test-id="ARTIST_HEADER_CONTEXT_MENU_BUTTON"]');
+  const shown = document.querySelector(`[${MARK}-artist]`);
+
+  if (!menu?.parentElement) {
+    shown?.remove();
+    return;
+  }
+
+  if (shown && shown.parentElement === menu.parentElement) return;
+  shown?.remove();
+
+  const button = menu.cloneNode(true);
+  button.setAttribute(`${MARK}-artist`, '1');
+
+  for (const name of ['data-test-id', 'aria-haspopup', 'aria-expanded', 'aria-pressed', 'disabled', 'aria-disabled', 'data-disabled']) {
+    button.removeAttribute(name);
+  }
+
+  button.disabled = false;
+  button.title = 'Скачать треки исполнителя в файлы';
+  button.setAttribute('aria-label', 'Скачать треки исполнителя в файлы');
+  if (!useSprite(button, SPRITE_DOWNLOAD_MENU)) button.replaceChildren(iconNode());
+
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    downloadArtist();
+  });
+
+  menu.insertAdjacentElement('afterend', button);
+}
+
 /**
  * Кнопка в панели плеера.
  *
@@ -462,29 +527,7 @@ function addMenuItem({ node, items }, kind, from) {
         if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
       }
     } else if (kind === 'artist') {
-      const who = ids.artistId || artistFromPage();
-      if (!who) return toast('Не понял, чьи треки скачивать');
-
-      const about = await ipcRenderer.invoke('kotamusic:artist:count', who);
-      if (about?.error) return toast(`Не вышло: ${about.error}`);
-
-      const yes = await ask(
-        'Скачать треки исполнителя?',
-        `${about.title}: ходовых треков — ${about.count}. Пойдут в файлы, как альбом.`,
-        [
-          { label: 'Скачать', value: true, main: true },
-          { label: 'Отмена', value: null },
-        ]
-      );
-
-      if (!yes) return;
-
-      const where = await whereTo('album');
-      if (where) {
-        toast('Собираю треки исполнителя…', { progress: 0, actions: stopAction() });
-        const result = await ipcRenderer.invoke('kotamusic:download:artist', who, where);
-        if (!result?.ok && !result?.stopped) toast(`Не вышло: ${result?.error || 'ошибка'}`);
-      }
+      await downloadArtist(ids.artistId);
     } else if (kind !== 'track') {
       // Раньше здесь молча качался играющий трек — не то, чего просили.
       toast(kind === 'album' ? 'Не понял, какой альбом скачивать' : 'Не понял, какой плейлист скачивать');
@@ -521,7 +564,12 @@ function addMenuItem({ node, items }, kind, from) {
 
   // Над «Скачать в файл» — родное скачивание клиента: его кнопка спрятана
   // в шапке, а из меню до неё ближе.
-  const own = offlineButton(from);
+  // Если клиент сам предлагает скачивание в этом меню, своего не добавляем:
+  // в меню трека и альбома у него есть «Скачать» («Удалить с устройства»,
+  // когда уже скачано).
+  const hasOwn = items.some((node) => /^(Скачать|Удалить с устройства)$/i.test(node.textContent.trim()));
+
+  const own = hasOwn ? null : offlineButton(from);
   if (own) {
     const offline = item.cloneNode(true);
     offline.setAttribute(`${MARK}-item`, '1');
@@ -715,33 +763,49 @@ function headerIds(from) {
 
   if (!head || (from && !head.contains(from))) return {};
 
+  // ⚠️Собираем всё, что нашли, и отдаём разом. Раньше отдавали первое
+  // попавшееся, и на странице альбома ссылка на исполнителя перебивала
+  // номер альбома: «Не понял, какой альбом скачивать».
+  const found = { albumId: null, trackId: null, owner: null, kind: null, artistId: null, uuid: null };
+
   const list = head.querySelector('a[href*="/playlists/"],a[href*="kind="]');
   if (list) {
     const ids = idsFrom(list.getAttribute('href'));
-    if (ids.owner) return ids;
+    if (ids.owner) {
+      found.owner = ids.owner;
+      found.kind = ids.kind;
+    }
   }
 
   const artist = head.querySelector('a[href*="artistId="]');
   const artistId = artist && /artistId=(\d+)/.exec(artist.getAttribute('href') || '');
-  if (artistId) return { albumId: null, trackId: null, owner: null, kind: null, artistId: artistId[1] };
+  if (artistId) found.artistId = artistId[1];
 
   // Адрес страницы клиента: с 5.120 плейлист открывается по опознавателю
   // (`/playlists?playlistUuid=…`), пары «владелец и номер» там больше нет.
   const here = new URLSearchParams(location.search);
-  const uuid = here.get('playlistUuid');
-  if (uuid) return { albumId: null, trackId: null, owner: null, kind: null, uuid };
+  found.uuid = here.get('playlistUuid') || null;
 
   const inUrl = idsFrom(location.pathname + location.search);
-  if (inUrl.albumId || inUrl.owner) return inUrl;
-
-  // Первая обложка в шапке — обложка самой сущности; дальше в шапке
-  // попадаются и чужие (у исполнителя альбома она тоже с «.a.»).
-  for (const picture of head.querySelectorAll('img')) {
-    const found = /\.a\.(\d+)-/.exec(picture.getAttribute('src') || '');
-    if (found) return { albumId: found[1], trackId: null, owner: null, kind: null };
+  if (inUrl.albumId) found.albumId = inUrl.albumId;
+  if (!found.owner && inUrl.owner) {
+    found.owner = inUrl.owner;
+    found.kind = inUrl.kind;
   }
 
-  return {};
+  // Номер альбома виден в адресе обложки: `…/xxxx.a.<номер>-1/…`.
+  // Первая картинка в шапке — обложка самой сущности.
+  if (!found.albumId) {
+    for (const picture of head.querySelectorAll('img')) {
+      const cover = /\.a\.(\d+)-/.exec(picture.getAttribute('src') || '');
+      if (cover) {
+        found.albumId = cover[1];
+        break;
+      }
+    }
+  }
+
+  return found;
 }
 
 /**
@@ -888,7 +952,10 @@ function start() {
     settings = state?.values || {};
 
     const tick = () => {
-      if (settings.downloadButton !== false) buildButton();
+      if (settings.downloadButton !== false) {
+        buildButton();
+        buildArtistButton();
+      }
       watchMenus();
     };
 
