@@ -24,6 +24,23 @@ const ICON_PATH = 'M12 4v11m0 0l-4-4m4 4l4-4M5 19h14';
 const LYRICS_PATH = 'M5 6h14M5 11h9M5 16h11M5 21h7';
 const FOLDER_PATH = 'M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z';
 
+// Значок скачивания из набора клиента: так кнопка совпадает с соседними
+// по размеру и цвету, что бы клиент им ни задавал.
+const SPRITE_DOWNLOAD = 'download_l';
+
+/**
+ * Подменяет картинку у клонированного значка клиента. Возвращает false,
+ * если у образца свой рисунок, а не ссылка на общий набор.
+ */
+function useSprite(node, name) {
+  const use = node.querySelector('use');
+  if (!use) return false;
+
+  use.setAttribute('xlink:href', `/icons/sprite.svg#${name}`);
+  use.setAttribute('href', `/icons/sprite.svg#${name}`);
+  return true;
+}
+
 /** Стрелка вниз. Рисунок строим узлами: разметкой он бы не появился. */
 function iconNode(size = 20) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -326,20 +343,23 @@ function buildButton() {
   button.removeAttribute('aria-haspopup');
   button.removeAttribute('aria-expanded');
   button.removeAttribute('aria-checked');
+  button.removeAttribute('aria-pressed');
 
   // ⚠️Образец мог быть выключен (в «Моей волне» «нравится» временами
-  // неактивна). Выключенная кнопка не отдаёт нажатий вовсе — снимаем
-  // признак, иначе наша кнопка видна, но мертва.
+  // неактивна). Выключенная кнопка не отдаёт нажатий вовсе, а по метке
+  // `data-disabled` клиент ещё и красит её в еле видимый серый — снимаем
+  // всё это, иначе кнопка выглядит блёкло и не работает.
   button.disabled = false;
   button.removeAttribute('disabled');
   button.removeAttribute('aria-disabled');
-  button.style.opacity = '';
-  button.style.pointerEvents = 'auto';
-  button.style.cursor = 'pointer';
+  button.removeAttribute('data-disabled');
 
   button.title = 'Скачать трек в файл';
   button.setAttribute('aria-label', 'Скачать трек в файл');
-  button.replaceChildren(iconNode());
+
+  // Значок берём из набора самого клиента: свой рисунок был другого
+  // размера и цвета, из-за чего кнопка выбивалась из ряда соседних.
+  if (!useSprite(button, SPRITE_DOWNLOAD)) button.replaceChildren(iconNode());
 
   button.addEventListener('click', (event) => {
     event.preventDefault();
