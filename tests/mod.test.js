@@ -243,7 +243,7 @@ test('остановка гасит только своё задание, нов
   ].join('\n');
 
   const make = new Function(
-    `let job = null; const log = { info() {} };
+    `let job = null; let placed = 0; let cancelled = 0; const log = { info() {} };
      ${source};
      return { beginJob, stopAll, isStop, peek: () => job };`
   );
@@ -278,4 +278,49 @@ test('обрыв загрузки считается остановкой, а н
   assert.strictEqual(isStop({ name: 'AbortError' }), true);
   assert.strictEqual(isStop(new Error('сеть отвалилась')), false);
   assert.strictEqual(isStop(new Error('сеть отвалилась'), { stopped: true }), true);
+});
+
+test('остановка снимает и то, что ждёт своей очереди', async () => {
+  // Собираем очередь ровно так, как она устроена в downloads.js.
+  const source = [
+    extract('mod/lib/downloads.js', 'beginJob'),
+    extract('mod/lib/downloads.js', 'stopAll'),
+    extract('mod/lib/downloads.js', 'enqueue'),
+  ].join('\n');
+
+  const make = new Function(
+    `let job = null; let placed = 0; let cancelled = 0;
+     let queue = Promise.resolve();
+     const log = { info() {} };
+     ${source};
+     return { enqueue, stopAll };`
+  );
+
+  const { enqueue, stopAll } = make();
+
+  const done = [];
+  const slow = () => new Promise((resolve) => setTimeout(resolve, 30));
+
+  // Первая задача уже идёт, ещё две ждут своей очереди.
+  const first = enqueue(async () => { await slow(); done.push('первая'); return { ok: true }; });
+  const second = enqueue(async () => { done.push('вторая'); return { ok: true }; });
+  const third = enqueue(async () => { done.push('третья'); return { ok: true }; });
+
+  // Даём первой задаче начаться — так же, как в жизни: человек жмёт
+  // «Остановить», когда что-то уже качается.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  stopAll();
+
+  const results = await Promise.all([first, second, third]);
+
+  // ⚠️Раньше ждущие задачи стартовали сразу после остановки, и человек
+  // видел, как «Останавливаю…» снова сменяется на «Скачиваю».
+  assert.deepStrictEqual(done, ['первая']);
+  assert.strictEqual(results[1].stopped, true);
+  assert.strictEqual(results[2].stopped, true);
+
+  // Просьба, поданная после остановки, работает как ни в чём не бывало.
+  const later = await enqueue(async () => { done.push('после'); return { ok: true }; });
+  assert.strictEqual(later.ok, true);
+  assert.deepStrictEqual(done, ['первая', 'после']);
 });

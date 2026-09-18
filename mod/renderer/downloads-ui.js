@@ -28,6 +28,11 @@ const FOLDER_PATH = 'M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0
 // по размеру и цвету, что бы клиент им ни задавал.
 const SPRITE_DOWNLOAD = 'download_l';
 
+// Те же значки, что клиент ставит в меню. Папки в наборе клиента нет,
+// её рисуем сами.
+const SPRITE_DOWNLOAD_MENU = 'download_xxs';
+const SPRITE_LYRICS_MENU = 'lyrics_xxs';
+
 /**
  * Подменяет картинку у клонированного значка клиента. Возвращает false,
  * если у образца свой рисунок, а не ссылка на общий набор.
@@ -384,7 +389,11 @@ function setLabel(item, text) {
 }
 
 /** Подменяет рисунок значка своим. */
-function setIcon(item, shape) {
+function setIcon(item, shape, sprite = null) {
+  // Если у клона значок берётся из общего набора клиента, подменяем
+  // картинку там же: так наши пункты выглядят как родные.
+  if (sprite && useSprite(item, sprite)) return;
+
   const picture = item.querySelector('svg');
   if (!picture) return;
 
@@ -422,7 +431,7 @@ function addMenuItem({ node, items }, kind, from) {
   for (let i = 1; i < pictures.length; i += 1) pictures[i].remove();
 
   // Если за образец взяли не «Скачать», значок у клона чужой — рисуем свой.
-  if (!/^Скачать/i.test(sample.textContent.trim())) setIcon(item, ICON_PATH);
+  setIcon(item, ICON_PATH, SPRITE_DOWNLOAD_MENU);
 
   setLabel(item, 'Скачать в файл');
 
@@ -473,7 +482,7 @@ function addMenuItem({ node, items }, kind, from) {
     const words = item.cloneNode(true);
     words.setAttribute(`${MARK}-item`, '1');
     setLabel(words, 'Текст песни');
-    setIcon(words, LYRICS_PATH);
+    setIcon(words, LYRICS_PATH, SPRITE_LYRICS_MENU);
 
     words.addEventListener('click', (event) => {
       event.preventDefault();
@@ -483,6 +492,25 @@ function addMenuItem({ node, items }, kind, from) {
     });
 
     item.insertAdjacentElement('beforebegin', words);
+  }
+
+  // Над «Скачать в файл» — родное скачивание клиента: его кнопка спрятана
+  // в шапке, а из меню до неё ближе.
+  const own = offlineButton(from);
+  if (own) {
+    const offline = item.cloneNode(true);
+    offline.setAttribute(`${MARK}-item`, '1');
+    setLabel(offline, offlineDone(own) ? 'Убрать из скачанного' : 'Скачать офлайн');
+    setIcon(offline, ICON_PATH, offlineDone(own) ? 'downloaded_xxs' : SPRITE_DOWNLOAD_MENU);
+
+    offline.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      pressLikeMouse(own);
+      document.body.click();
+    });
+
+    item.insertAdjacentElement('beforebegin', offline);
   }
 
   // Следом — «Открыть папку»: сразу после скачивания это первое,
@@ -685,6 +713,53 @@ function headerIds(from) {
   }
 
   return {};
+}
+
+/**
+ * Родная кнопка клиента «Скачать» — та, что кладёт треки в память клиента
+ * для прослушивания без интернета. Ищем рядом с кнопкой, открывшей меню,
+ * а если её там нет — в шапке страницы.
+ */
+function offlineButton(from) {
+  const near = from?.parentElement?.querySelector('[data-test-id$="_DOWNLOAD_BUTTON"]');
+  if (near) return near;
+
+  const head = from?.closest?.('[data-test-id="ENTITY_HEADER"]')
+    || document.querySelector('[data-test-id="ENTITY_HEADER"]');
+
+  const found = head?.querySelector('[data-test-id$="_DOWNLOAD_BUTTON"]');
+  return found && found.getBoundingClientRect().width > 0 ? found : null;
+}
+
+/** Уже скачано в клиент? Клиент рисует это своим значком. */
+function offlineDone(button) {
+  const use = button.querySelector('use');
+  const name = use?.getAttribute('xlink:href') || use?.getAttribute('href') || '';
+  return /downloaded/i.test(name);
+}
+
+/** Нажатие как настоящей мышью: кнопки клиента ждут именно такого. */
+function pressLikeMouse(node) {
+  const rect = node.getBoundingClientRect();
+  const where = {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    button: 0,
+    buttons: 1,
+    pointerId: 1,
+    pointerType: 'mouse',
+    isPrimary: true,
+  };
+
+  node.dispatchEvent(new PointerEvent('pointerdown', where));
+  node.dispatchEvent(new MouseEvent('mousedown', where));
+  node.dispatchEvent(new PointerEvent('pointerup', where));
+  node.dispatchEvent(new MouseEvent('mouseup', where));
+  node.dispatchEvent(new MouseEvent('click', where));
 }
 
 /** Номер трека, по которому открыли меню. */

@@ -48,6 +48,10 @@ let queue = Promise.resolve();
  */
 let job = null;
 
+// Сколько задач поставлено и до какой включительно они отменены.
+let placed = 0;
+let cancelled = 0;
+
 /** Начало работы: задание создаётся, когда до него дошла очередь. */
 function beginJob() {
   job = { stopped: false, breakers: new Set() };
@@ -56,7 +60,16 @@ function beginJob() {
 
 /** Прерывает то, что качается прямо сейчас. */
 function stopAll() {
-  if (!job || job.stopped) return false;
+  const waiting = placed - cancelled - (job && !job.stopped ? 1 : 0);
+
+  // Ждущие своей очереди задачи отменяем всегда, даже если прямо сейчас
+  // ничего не качается.
+  cancelled = placed;
+
+  if (!job || job.stopped) {
+    if (waiting > 0) log.info(`Отменено задач в очереди: ${waiting}`);
+    return waiting > 0;
+  }
 
   job.stopped = true;
 
@@ -68,7 +81,11 @@ function stopAll() {
     }
   }
 
-  log.info(`Скачивание остановлено человеком (прервано загрузок: ${job.breakers.size})`);
+  log.info(
+    `Скачивание остановлено человеком (прервано загрузок: ${job.breakers.size}` +
+      (waiting > 0 ? `, отменено в очереди: ${waiting}` : '') +
+      ')'
+  );
   job.breakers.clear();
   return true;
 }
@@ -225,7 +242,25 @@ async function fetchToFileInner(url, destination, keyHex, onProgress, signal) {
 }
 
 /** Сообщение о ходе дела в окно клиента. */
+// Когда в последний раз рассказывали о ходе дела.
+let toldAt = 0;
+
+/**
+ * Сообщает окну, как идут дела.
+ *
+ * ⚠️Раньше отчёт уходил на каждый кусок каждого файла — до нескольких
+ * десятков раз в миллисекунду. Окно захлёбывалось перерисовкой и переставало
+ * отзываться: нажатие на «Остановить» просто не доходило до мода, и со
+ * стороны казалось, что кнопка не работает. Теперь — не чаще пяти раз в
+ * секунду, а важное (конец, остановка, ошибка) идёт всегда.
+ */
 function report(state) {
+  const important = Boolean(state.done || state.error || state.stopped);
+  const now = Date.now();
+
+  if (!important && now - toldAt < 200) return;
+  toldAt = now;
+
   if (!state.done) state = { ...state, speed: speedText() };
   if (state.speed) log.debug('Ход дела:', state.text || '', state.speed, `${Math.round((state.share || 0) * 100)}%`);
 
@@ -356,9 +391,25 @@ async function downloadTrack(track, { dir, mp3, onProgress } = {}) {
   return file;
 }
 
-/** Ставит задачу в очередь: разом качаем не больше, чем нужно. */
+/**
+ * Ставит задачу в очередь: разом качаем не больше, чем нужно.
+ *
+ * ⚠️«Остановить» гасит не только то, что идёт, но и всё, что уже стоит в
+ * очереди. Иначе после остановки тут же стартовала следующая задача, и со
+ * стороны это выглядело так, будто кнопка не работает: сообщение сменялось
+ * на «Останавливаю…» и снова на «Скачиваю».
+ */
 function enqueue(task) {
-  queue = queue.then(task, task);
+  const ticket = ++placed;
+
+  const run = async () => {
+    if (ticket <= cancelled) return { ok: false, stopped: true };
+
+    beginJob();
+    return task();
+  };
+
+  queue = queue.then(run, run);
   return queue;
 }
 
@@ -552,8 +603,6 @@ function start() {
 
   ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) => {
     return enqueue(async () => {
-      beginJob();
-
       try {
         // Первое скачивание: спросим, где держать музыку.
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
@@ -574,8 +623,6 @@ function start() {
   // название с исполнителем — трек находим сами.
   ipcMain.handle('kotamusic:download:current', async (_event, about) => {
     return enqueue(async () => {
-      beginJob();
-
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -596,8 +643,6 @@ function start() {
 
   ipcMain.handle('kotamusic:download:album', async (_event, albumId, options = {}) => {
     return enqueue(async () => {
-      beginJob();
-
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -614,8 +659,6 @@ function start() {
 
   ipcMain.handle('kotamusic:download:playlist', async (_event, owner, kind, options = {}) => {
     return enqueue(async () => {
-      beginJob();
-
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
