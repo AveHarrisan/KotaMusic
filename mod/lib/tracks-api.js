@@ -239,6 +239,24 @@ async function albumTracks(albumId) {
   };
 }
 
+/**
+ * Популярные треки исполнителя: то же, что клиент показывает в его шапке.
+ * Скачивать «всё подряд» у исполнителя незачем — берём ходовые.
+ */
+async function artistTracks(artistId, limit = 20) {
+  const brief = await request(`artists/${artistId}/brief-info`);
+  const ready = (brief?.popularTracks || []).filter((track) => track?.id);
+
+  const name = brief?.artist?.name || 'Исполнитель';
+  if (ready.length) return { title: name, tracks: ready.slice(0, limit) };
+
+  // Бывает, что приходят одни номера.
+  const list = await request(`artists/${artistId}/track-ids-by-rating`);
+  const ids = (list?.tracks || []).slice(0, limit).map(String);
+  const tracks = ids.length ? await tracksMeta(ids) : [];
+  return { title: name, tracks };
+}
+
 /** Треки плейлиста. */
 let uid = null;
 
@@ -328,4 +346,5 @@ module.exports = {
   albumTracks,
   playlistTracks,
   playlistByUuid,
+  artistTracks,
 };

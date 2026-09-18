@@ -727,6 +727,32 @@ function start() {
     return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
   });
 
+  ipcMain.handle('kotamusic:download:artist', async (_event, artistId, options = {}) => {
+    return enqueue(async () => {
+      try {
+        if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
+
+        const { title, tracks } = await api.artistTracks(artistId);
+        const result = await many(tracks, title || `Исполнитель ${artistId}`, options);
+        return { ok: true, ...result };
+      } catch (e) {
+        log.warn('Треки исполнителя не скачались:', e.message);
+        notice.show(`Не удалось скачать треки исполнителя: ${e.message}`);
+        return { ok: false, error: e.message };
+      }
+    });
+  });
+
+  // Сколько ходовых треков у исполнителя — чтобы спросить до скачивания.
+  ipcMain.handle('kotamusic:artist:count', async (_event, artistId) => {
+    try {
+      const { title, tracks } = await api.artistTracks(artistId);
+      return { title, count: tracks.length };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
   // Остановить всё, что качается: и то, что уже идёт, и очередь.
   ipcMain.handle('kotamusic:download:stop', () => ({ ok: stopAll() }));
 

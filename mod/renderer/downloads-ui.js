@@ -15,6 +15,7 @@ const QUALITY_BUTTON = '[data-test-id="SOUND_QUALITY_BUTTON"]';
 function menuKind(id) {
   if (id.startsWith('ALBUM')) return 'album';
   if (id.startsWith('PLAYLIST')) return 'playlist';
+  if (id.startsWith('ARTIST')) return 'artist';
   return 'track';
 }
 
@@ -460,6 +461,30 @@ function addMenuItem({ node, items }, kind, from) {
         );
         if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
       }
+    } else if (kind === 'artist') {
+      const who = ids.artistId || artistFromPage();
+      if (!who) return toast('Не понял, чьи треки скачивать');
+
+      const about = await ipcRenderer.invoke('kotamusic:artist:count', who);
+      if (about?.error) return toast(`Не вышло: ${about.error}`);
+
+      const yes = await ask(
+        'Скачать треки исполнителя?',
+        `${about.title}: ходовых треков — ${about.count}. Пойдут в файлы, как альбом.`,
+        [
+          { label: 'Скачать', value: true, main: true },
+          { label: 'Отмена', value: null },
+        ]
+      );
+
+      if (!yes) return;
+
+      const where = await whereTo('album');
+      if (where) {
+        toast('Собираю треки исполнителя…', { progress: 0, actions: stopAction() });
+        const result = await ipcRenderer.invoke('kotamusic:download:artist', who, where);
+        if (!result?.ok && !result?.stopped) toast(`Не вышло: ${result?.error || 'ошибка'}`);
+      }
     } else if (kind !== 'track') {
       // Раньше здесь молча качался играющий трек — не то, чего просили.
       toast(kind === 'album' ? 'Не понял, какой альбом скачивать' : 'Не понял, какой плейлист скачивать');
@@ -696,6 +721,10 @@ function headerIds(from) {
     if (ids.owner) return ids;
   }
 
+  const artist = head.querySelector('a[href*="artistId="]');
+  const artistId = artist && /artistId=(\d+)/.exec(artist.getAttribute('href') || '');
+  if (artistId) return { albumId: null, trackId: null, owner: null, kind: null, artistId: artistId[1] };
+
   // Адрес страницы клиента: с 5.120 плейлист открывается по опознавателю
   // (`/playlists?playlistUuid=…`), пары «владелец и номер» там больше нет.
   const here = new URLSearchParams(location.search);
@@ -760,6 +789,16 @@ function pressLikeMouse(node) {
   node.dispatchEvent(new PointerEvent('pointerup', where));
   node.dispatchEvent(new MouseEvent('mouseup', where));
   node.dispatchEvent(new MouseEvent('click', where));
+}
+
+/** Номер исполнителя со страницы, на которой мы стоим. */
+function artistFromPage() {
+  const here = new URLSearchParams(location.search).get('artistId');
+  if (here) return here;
+
+  const head = document.querySelector('[data-test-id="ENTITY_HEADER"]');
+  const found = /artistId=(\d+)/.exec(head?.innerHTML || '');
+  return found ? found[1] : null;
 }
 
 /** Номер трека, по которому открыли меню. */
