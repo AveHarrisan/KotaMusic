@@ -153,6 +153,16 @@ async function lyricsFor({ trackId, title, artist, album, duration }) {
 
 function start() {
   ipcMain.handle('kotamusic:lyrics:get', (_event, track) => lyricsFor(track || {}));
+
+  // Проверка панели без мыши: окно само откроет её и будет писать в
+  // журнал, какая строка подсвечена. Включается переменной окружения.
+  if (process.env.KOTAMUSIC_LYRICS_TEST) {
+    setTimeout(() => {
+      for (const window of require('electron').BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send('kotamusic:lyrics:open');
+      }
+    }, 9000);
+  }
 }
 
 module.exports = { start, lyricsFor, parseLrc, isEmptyText };

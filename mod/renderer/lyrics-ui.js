@@ -56,7 +56,13 @@ function clean(node) {
 }
 
 function timecode() {
-  const slider = document.querySelector(SLIDER);
+  // Ползунков на странице бывает несколько (панель и полноэкранный вид);
+  // берём тот, у которого есть длительность и он на виду.
+  const sliders = [...document.querySelectorAll(SLIDER)].filter(
+    (node) => Number(node.max) > 0 && node.getClientRects().length
+  );
+
+  const slider = sliders[sliders.length - 1] || document.querySelector(SLIDER);
   if (slider) {
     return { position: Number(slider.value) || 0, duration: Number(slider.max) || 0 };
   }
@@ -182,6 +188,8 @@ function highlight() {
   if (!box || !current?.synced || !lines.length) return;
 
   const { position } = timecode();
+  const nodes = box.querySelectorAll('[data-role="body"] > div');
+  if (nodes.length !== lines.length) return;
 
   let index = -1;
   for (let i = 0; i < lines.length; i += 1) {
@@ -189,16 +197,20 @@ function highlight() {
     else break;
   }
 
-  if (index === active) return;
+  // Строку красим всегда, а не только при её смене: после перемотки
+  // клиент перерисовывает панель, и прежняя подсветка пропадала.
+  const moved = index !== active;
   active = index;
 
-  const nodes = box.querySelectorAll('[data-role="body"] > div');
   nodes.forEach((node, i) => {
     const on = i === index;
     node.style.opacity = on ? '1' : '.45';
     node.style.color = on ? '#ffdb4d' : '';
     node.style.fontWeight = on ? '600' : '';
-    if (on) node.scrollIntoView({ block: 'center' });
+
+    // Прокручиваем, только когда строка сменилась и мышь не на панели:
+    // иначе панель дёргалась бы под курсором при чтении.
+    if (on && moved && !box.matches(':hover')) node.scrollIntoView({ block: 'center' });
   });
 }
 
@@ -252,6 +264,21 @@ function start() {
   document.addEventListener('kotamusic:lyrics:toggle', () => {
     if (panel()) closePanel();
     else openPanel();
+  });
+
+  // Проверка без мыши: открыть панель и рассказывать, что подсвечено.
+  ipcRenderer.on('kotamusic:lyrics:open', () => {
+    openPanel();
+
+    setInterval(() => {
+      if (!panel() || !current?.synced) return;
+
+      ipcRenderer.send('kotamusic:debug:probe', {
+        время: Math.round(timecode().position),
+        строка: active,
+        текст: (lines[active] || {}).text || '—',
+      });
+    }, 2000);
   });
 
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
