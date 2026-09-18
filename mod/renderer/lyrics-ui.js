@@ -84,14 +84,27 @@ function playing() {
   if (!bar) return null;
 
   const titleNode = bar.querySelector(TITLE);
-  const title = clean(titleNode);
+  let title = clean(titleNode);
   if (!title) return null;
 
   const artistNodes = bar.querySelectorAll(ARTIST).length
     ? bar.querySelectorAll(ARTIST)
     : document.querySelectorAll(ARTIST);
 
-  const artist = [...artistNodes].map(clean).filter(Boolean).join(', ');
+  let artist = [...artistNodes].map(clean).filter(Boolean).join(', ');
+
+  // В «Моей волне» исполнителя отдельно нет, а название приходит
+  // склейкой «Исполнитель —Название». С такой склейкой текст не ищется.
+  const cut = title.indexOf(' —');
+  if (cut > 0 && cut + 2 < title.length) {
+    const head = title.slice(0, cut).trim();
+    const rest = title.slice(cut + 2).trim();
+
+    if (!artist || head === artist) {
+      title = rest;
+      artist = artist || head;
+    }
+  }
   const link = bar.querySelector('a[href*="trackId="],a[href*="/track/"]');
   const href = link?.getAttribute('href') || '';
   const trackId = /trackId=(\d+)/.exec(href)?.[1] || /\/track\/(\d+)/.exec(href)?.[1] || null;
@@ -107,45 +120,211 @@ function closePanel() {
   panel()?.remove();
 }
 
+// Размеры по умолчанию и самые маленькие, до которых можно сжать.
+const DEFAULT_BOX = { width: 360, height: 420 };
+const MIN_BOX = { width: 240, height: 160 };
+
+let saved = null; // где панель стояла в прошлый раз
+let fullscreen = false;
+
+/** Размер шрифта в панели — из настроек. */
+function fontSize() {
+  const value = Number(settings.lyricsFontSize);
+  return Number.isFinite(value) && value >= 10 && value <= 40 ? value : 15;
+}
+
+const headButton = (sign, title) => {
+  const node = document.createElement('button');
+  node.type = 'button';
+  node.textContent = sign;
+  node.title = title;
+  node.setAttribute('aria-label', title);
+  node.style.cssText =
+    'border:none;background:none;color:inherit;cursor:pointer;font-size:13px;' +
+    'opacity:.6;padding:0 3px;line-height:1';
+  node.addEventListener('mouseenter', () => (node.style.opacity = '1'));
+  node.addEventListener('mouseleave', () => (node.style.opacity = '.6'));
+  return node;
+};
+
+/** Ставит панель на место и размер: свои, запомненные или во весь экран. */
+function applyBox(box) {
+  if (fullscreen) {
+    Object.assign(box.style, {
+      left: '16px',
+      top: '16px',
+      right: 'auto',
+      bottom: 'auto',
+      width: `${window.innerWidth - 32}px`,
+      height: `${window.innerHeight - 32}px`,
+      maxHeight: 'none',
+      resize: 'none',
+    });
+
+    // Во весь экран текст читают издалека: ставим по центру и крупнее.
+    const wide = box.querySelector('[data-role="body"]');
+    if (wide) {
+      wide.style.textAlign = 'center';
+      // Во весь экран читают издалека — шрифт крупнее выбранного.
+      wide.style.fontSize = `${Math.round(fontSize() * 1.6)}px`;
+      wide.style.padding = '10vh 8vw';
+    }
+
+    return;
+  }
+
+  const body = box.querySelector('[data-role="body"]');
+  if (body) {
+    body.style.textAlign = 'left';
+    body.style.fontSize = `${fontSize()}px`;
+    body.style.padding = '12px 14px 16px';
+  }
+
+  const place = saved || {
+    left: Math.max(16, window.innerWidth - DEFAULT_BOX.width - 16),
+    top: Math.max(16, window.innerHeight - DEFAULT_BOX.height - 96),
+    ...DEFAULT_BOX,
+  };
+
+  Object.assign(box.style, {
+    left: `${Math.round(place.left)}px`,
+    top: `${Math.round(place.top)}px`,
+    right: 'auto',
+    bottom: 'auto',
+    width: `${Math.round(place.width)}px`,
+    height: `${Math.round(place.height)}px`,
+    maxHeight: 'none',
+    resize: 'both',
+  });
+}
+
+/** Запоминает, где панель стоит сейчас. */
+function rememberBox(box) {
+  if (fullscreen) return;
+
+  const rect = box.getBoundingClientRect();
+  saved = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  ipcRenderer.invoke('kotamusic:settings:set', { lyricsPanelBox: saved });
+}
+
+/** Перетаскивание за заголовок. */
+function makeDraggable(box, handle) {
+  handle.addEventListener('pointerdown', (event) => {
+    if (fullscreen || event.target.closest('button')) return;
+
+    const rect = box.getBoundingClientRect();
+    const shiftX = event.clientX - rect.left;
+    const shiftY = event.clientY - rect.top;
+
+    const move = (moveEvent) => {
+      // Не даём утащить панель за край: иначе её не вернуть мышью.
+      const left = Math.min(
+        Math.max(0, moveEvent.clientX - shiftX),
+        window.innerWidth - rect.width
+      );
+      const top = Math.min(
+        Math.max(0, moveEvent.clientY - shiftY),
+        window.innerHeight - rect.height
+      );
+
+      box.style.left = `${Math.round(left)}px`;
+      box.style.top = `${Math.round(top)}px`;
+    };
+
+    const stop = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', stop);
+      rememberBox(box);
+    };
+
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', stop);
+    event.preventDefault();
+  });
+
+  handle.style.cursor = 'move';
+}
+
 function buildPanel() {
   closePanel();
 
   const box = document.createElement('div');
   box.setAttribute(PANEL, '1');
   box.style.cssText =
-    'position:fixed;right:16px;bottom:96px;z-index:2147483645;width:360px;max-height:60vh;' +
+    'position:fixed;z-index:2147483645;' +
+    `min-width:${MIN_BOX.width}px;min-height:${MIN_BOX.height}px;` +
     'display:flex;flex-direction:column;border-radius:16px;background:rgba(24,24,24,.97);' +
     'color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.5);font:14px/1.5 system-ui,sans-serif;' +
     '-webkit-app-region:no-drag;overflow:hidden';
 
   const head = document.createElement('div');
   head.style.cssText =
-    'display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)';
+    'display:flex;align-items:center;gap:6px;padding:12px 14px;flex:none;' +
+    'border-bottom:1px solid rgba(255,255,255,.08)';
 
   const name = document.createElement('div');
   name.setAttribute('data-role', 'name');
-  name.style.cssText = 'flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  name.style.cssText =
+    'flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 
   const source = document.createElement('div');
   source.setAttribute('data-role', 'source');
-  source.style.cssText = 'font-size:11px;opacity:.5;white-space:nowrap';
+  source.style.cssText = 'font-size:11px;opacity:.5;white-space:nowrap;margin-right:4px';
 
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.textContent = '✕';
-  close.title = 'Закрыть';
-  close.style.cssText =
-    'border:none;background:none;color:inherit;cursor:pointer;font-size:14px;opacity:.6;padding:0 2px';
+  const reset = headButton('⤢', 'Вернуть размер и место');
+  reset.textContent = '⟲';
+  reset.addEventListener('click', () => {
+    fullscreen = false;
+    saved = null;
+    ipcRenderer.invoke('kotamusic:settings:set', { lyricsPanelBox: null });
+    applyBox(box);
+  });
+
+  const expand = headButton('⛶', 'Во весь экран');
+  expand.addEventListener('click', () => {
+    fullscreen = !fullscreen;
+    expand.textContent = fullscreen ? '🗗' : '⛶';
+    expand.title = fullscreen ? 'Вернуть прежний размер' : 'Во весь экран';
+    applyBox(box);
+  });
+
+  const close = headButton('✕', 'Закрыть');
   close.addEventListener('click', closePanel);
 
-  head.append(name, source, close);
+  head.append(name, source, reset, expand, close);
 
   const body = document.createElement('div');
   body.setAttribute('data-role', 'body');
-  body.style.cssText = 'padding:12px 14px 16px;overflow-y:auto;scroll-behavior:smooth';
+  body.style.cssText = 'padding:12px 14px 16px;overflow-y:auto;scroll-behavior:smooth;flex:1;min-height:0';
 
   box.append(head, body);
   document.body.appendChild(box);
+
+  applyBox(box);
+  makeDraggable(box, head);
+
+  if (settings.debug) {
+    setTimeout(() => {
+      const rect = box.getBoundingClientRect();
+      ipcRenderer.send('kotamusic:debug:probe', {
+        панель: `${Math.round(rect.width)}x${Math.round(rect.height)} в (${Math.round(rect.left)}, ${Math.round(rect.top)})`,
+        окно: `${window.innerWidth}x${window.innerHeight}`,
+        стиль: box.style.cssText.slice(0, 200),
+      });
+    }, 500);
+  }
+
+  // Растянули за угол — запоминаем новый размер. Первый вызов приходит
+  // сразу при наблюдении, его пропускаем: запоминать там нечего.
+  let first = true;
+  new ResizeObserver(() => {
+    if (first) {
+      first = false;
+      return;
+    }
+    rememberBox(box);
+  }).observe(box);
+
   return box;
 }
 
@@ -266,6 +445,14 @@ function start() {
     else openPanel();
   });
 
+  ipcRenderer.on('kotamusic:lyrics:full', () => {
+    const box = panel();
+    if (!box) return;
+
+    fullscreen = !fullscreen;
+    applyBox(box);
+  });
+
   // Проверка без мыши: открыть панель и рассказывать, что подсвечено.
   ipcRenderer.on('kotamusic:lyrics:open', () => {
     openPanel();
@@ -283,6 +470,17 @@ function start() {
 
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
     settings = state?.values || {};
+
+    // Панель встаёт туда же, где её оставили в прошлый раз.
+    const box = settings.lyricsPanelBox;
+    if (box && Number.isFinite(box.left) && Number.isFinite(box.top)) {
+      saved = {
+        left: box.left,
+        top: box.top,
+        width: Math.max(MIN_BOX.width, box.width || DEFAULT_BOX.width),
+        height: Math.max(MIN_BOX.height, box.height || DEFAULT_BOX.height),
+      };
+    }
 
     let shownFor = null;
 

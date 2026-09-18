@@ -667,6 +667,15 @@ function fill(container) {
         toggle(config.lyricsButton, (value) => update({ lyricsButton: value }))
       ),
       row(
+        'Размер шрифта',
+        'В панели с текстом; во весь экран мод увеличивает его сам',
+        choice(
+          [[13, 'Мелкий'], [15, 'Обычный'], [18, 'Крупный'], [22, 'Очень крупный']],
+          config.lyricsFontSize,
+          (value) => update({ lyricsFontSize: value })
+        )
+      ),
+      row(
         'Искать в LRCLib',
         'Открытая база текстов — когда у Яндекса текста нет',
         toggle(config.lyricsLrclib, (value) => update({ lyricsLrclib: value }))

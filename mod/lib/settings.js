@@ -36,6 +36,9 @@ const DEFAULTS = {
 
   // Текст песни: своя панель и запасной источник LRCLib.
   lyricsButton: true,
+  // Где человек поставил панель с текстом и какого она размера.
+  lyricsPanelBox: null,
+  lyricsFontSize: 15,
   lyricsLrclib: true,
   // Кнопка скачивания в панели плеера и подпись с качеством трека.
   downloadButton: true,

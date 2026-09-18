@@ -157,11 +157,16 @@ function start() {
   // Проверка панели без мыши: окно само откроет её и будет писать в
   // журнал, какая строка подсвечена. Включается переменной окружения.
   if (process.env.KOTAMUSIC_LYRICS_TEST) {
-    setTimeout(() => {
-      for (const window of require('electron').BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send('kotamusic:lyrics:open');
-      }
-    }, 9000);
+    const tell = (channel, delay) =>
+      setTimeout(() => {
+        for (const window of require('electron').BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) window.webContents.send(channel);
+        }
+      }, delay);
+
+    tell('kotamusic:lyrics:open', 9000);
+    // Второй шаг проверки: панель во весь экран.
+    if (process.env.KOTAMUSIC_LYRICS_TEST === 'full') tell('kotamusic:lyrics:full', 16000);
   }
 }
 

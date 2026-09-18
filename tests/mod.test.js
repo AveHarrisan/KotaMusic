@@ -206,6 +206,7 @@ test('все настройки мода видны в окне настроек
   // Служебные значения человеку показывать нечего: их мод хранит сам.
   const hidden = new Set([
     'miniplayerPosition',
+    'lyricsPanelBox',
     'miniplayerSize',
     'windowSize',
     'hintShown',
