@@ -56,7 +56,12 @@ async function fromYandex(trackId) {
     if (!text || isEmptyText(text)) return null;
 
     const lines = parseLrc(text);
-    return { source: 'Яндекс Музыка', synced: lines.length > 0, lines, text };
+    return {
+      source: lines.length ? 'Яндекс Музыка' : 'Яндекс Музыка, без времени',
+      synced: lines.length > 0,
+      lines,
+      text,
+    };
   } catch (e) {
     log.debug('Текста у Яндекса нет:', e.message);
     return null;
@@ -89,7 +94,7 @@ function fromLrclibItem(item) {
   }
 
   if (item.plainLyrics && !isEmptyText(item.plainLyrics)) {
-    return { source: 'LRCLib', synced: false, lines: [], text: item.plainLyrics };
+    return { source: 'LRCLib, без времени', synced: false, lines: [], text: item.plainLyrics };
   }
 
   return null;
@@ -107,21 +112,35 @@ async function fromLrclib({ title, artist, album, duration }) {
       ...(duration ? { duration: Math.round(duration) } : {}),
     });
 
-    const found = fromLrclibItem(exact);
-    if (found) return found;
+    // ⚠️Сначала ищем текст со временем: только с ним строка подсвечивается
+    // по ходу песни. Раньше брался первый попавшийся, и если у него времени
+    // не было, панель показывала текст, который никогда не подсвечивался,
+    // хотя у соседней записи время было.
+    const exactFound = fromLrclibItem(exact);
+    if (exactFound?.synced) return exactFound;
 
-    // Не нашлось — обычный поиск, из ответа берём подходящее по времени.
+    // Обычный поиск: из ответа берём подходящее по длительности.
     const list = await ask('search', { track_name: title, artist_name: artist });
-    if (!Array.isArray(list) || !list.length) return null;
+    const all = Array.isArray(list) ? list : [];
 
-    const suitable = list
+    const suitable = all
       .filter((item) => !duration || Math.abs((item.duration || 0) - duration) <= 10)
       .sort(
         (a, b) =>
           Math.abs((a.duration || 0) - (duration || 0)) - Math.abs((b.duration || 0) - (duration || 0))
       );
 
-    for (const item of suitable.length ? suitable : list) {
+    const queue = suitable.length ? suitable : all;
+
+    for (const item of queue) {
+      const result = fromLrclibItem(item);
+      if (result?.synced) return result;
+    }
+
+    // Со временем ни у кого нет — отдаём хоть какой-то текст.
+    if (exactFound) return exactFound;
+
+    for (const item of queue) {
       const result = fromLrclibItem(item);
       if (result) return result;
     }

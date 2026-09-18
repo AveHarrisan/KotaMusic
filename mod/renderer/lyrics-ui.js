@@ -11,8 +11,11 @@ const BAR = '[data-test-id="PLAYERBAR_DESKTOP"],[data-test-id="VIBE_PLAYERBAR"]'
 const QUALITY_BUTTON = '[data-test-id="SOUND_QUALITY_BUTTON"]';
 const TITLE = '[data-test-id="TRACK_TITLE"],[data-test-id="VIBE_PLAYERBAR_TRACK_NAME"]';
 const ARTIST = '[data-test-id="SEPARATED_ARTIST_TITLE"]';
-const SLIDER = '[data-test-id="TIMECODE_SLIDER"]';
-const TIMECODE = '[data-test-id="VIBE_PLAYERBAR_TIMECODE"]';
+// ⚠️Ползунок времени называется по-разному: в обычной панели один,
+// в «Моей волне» другой. Если брать только первый, подсветка строк в
+// «Моей волне» стоит на месте.
+const SLIDER = '[data-test-id="TIMECODE_SLIDER"],[data-test-id="VIBE_PLAYERBAR_TIMECODE_SLIDER"]';
+const TIMECODE = '[data-test-id="VIBE_PLAYERBAR_TIMECODE"],[data-test-id="TIMECODE_TIME_START"]';
 
 const MARK = 'data-kotamusic-lyrics';
 const PANEL = 'data-kotamusic-lyrics-panel';
@@ -58,11 +61,17 @@ function clean(node) {
 function timecode() {
   // Ползунков на странице бывает несколько (панель и полноэкранный вид);
   // берём тот, у которого есть длительность и он на виду.
-  const sliders = [...document.querySelectorAll(SLIDER)].filter(
-    (node) => Number(node.max) > 0 && node.getClientRects().length
-  );
+  // ⚠️В «Моей волне» ползунок времени — не поле с числом, а обычный
+  // элемент: у него нет ни value, ни max. Раньше мод брал из него ноль,
+  // и подсветка строк стояла на первой строке весь трек. Поэтому берём
+  // только настоящие поля, а иначе читаем время подписью.
+  const sliders = [...document.querySelectorAll(SLIDER)].filter((node) => {
+    const max = Number(node.max);
+    const value = Number(node.value);
+    return Number.isFinite(max) && max > 0 && Number.isFinite(value) && node.getClientRects().length;
+  });
 
-  const slider = sliders[sliders.length - 1] || document.querySelector(SLIDER);
+  const slider = sliders[sliders.length - 1];
   if (slider) {
     return { position: Number(slider.value) || 0, duration: Number(slider.max) || 0 };
   }
@@ -328,6 +337,7 @@ function buildPanel() {
   const body = document.createElement('div');
   body.setAttribute('data-role', 'body');
   body.style.cssText = 'padding:12px 14px 16px;overflow-y:auto;scroll-behavior:smooth;flex:1;min-height:0';
+  watchScrolling(body);
 
   box.append(head, body);
   document.body.appendChild(box);
@@ -386,6 +396,42 @@ function renderLines(box) {
   }
 }
 
+// Когда человек последний раз крутил текст сам: пока читает — не мешаем.
+let scrolledAt = 0;
+
+/** Человек листает сам — автопрокрутка отходит в сторону. */
+function watchScrolling(body) {
+  for (const type of ['wheel', 'pointerdown', 'touchstart', 'keydown']) {
+    body.addEventListener(type, () => (scrolledAt = Date.now()), { passive: true });
+  }
+}
+
+/**
+ * Держит подсвеченную строку в середине панели.
+ *
+ * ⚠️`scrollIntoView` двигает не только нашу панель, но и страницу клиента
+ * под ней, поэтому считаем сами и крутим только своё окно текста. Ещё два
+ * правила вежливости: не дёргаем, когда строка и так почти по центру, и
+ * молчим, пока человек читает — держит мышь над панелью или сам крутил
+ * последние несколько секунд.
+ */
+function keepInView(box, node) {
+  const body = box.querySelector('[data-role="body"]');
+  if (!body) return;
+
+  if (box.matches(':hover')) return;
+  if (Date.now() - scrolledAt < 5000) return;
+
+  const frame = body.getBoundingClientRect();
+  const line = node.getBoundingClientRect();
+  const target = body.scrollTop + (line.top - frame.top) - (frame.height - line.height) / 2;
+
+  const top = Math.max(0, Math.min(target, body.scrollHeight - body.clientHeight));
+  if (Math.abs(top - body.scrollTop) < 6) return;
+
+  body.scrollTo({ top, behavior: 'smooth' });
+}
+
 /** Подсветка строки по времени трека. */
 function highlight() {
   const box = panel();
@@ -412,9 +458,7 @@ function highlight() {
     node.style.color = on ? '#ffdb4d' : '';
     node.style.fontWeight = on ? '600' : '';
 
-    // Прокручиваем, только когда строка сменилась и мышь не на панели:
-    // иначе панель дёргалась бы под курсором при чтении.
-    if (on && moved && !box.matches(':hover')) node.scrollIntoView({ block: 'center' });
+    if (on && moved) keepInView(box, node);
   });
 }
 
