@@ -446,11 +446,22 @@ function start() {
 
   // Качество и кодек: спрашиваем у того же API, что и ссылку на файл,
   // и держим ответ в памяти — на один трек одного запроса достаточно.
-  ipcMain.handle('kotamusic:track:quality', async (_event, trackId) => {
-    if (!trackId) return null;
-    if (quality.has(trackId)) return quality.get(trackId);
+  ipcMain.handle('kotamusic:track:quality', async (_event, about) => {
+    // Из панели приходит номер трека, а из «Моей волны» — название:
+    // там ссылки на трек нет вовсе.
+    let trackId = typeof about === 'object' ? about?.trackId : about;
+    const key = trackId || (typeof about === 'object' ? `${about?.artist} — ${about?.title}` : null);
+    if (!key) return null;
+    if (quality.has(key)) return quality.get(key);
 
     try {
+      if (!trackId) {
+        const found = await api.findTrack(about || {});
+        trackId = found?.id || null;
+      }
+
+      if (!trackId) return null;
+
       const info = await api.fileInfo(trackId);
       const codec = api.CODEC_LABEL[info?.codec] || String(info?.codec || '').toUpperCase();
       const mark = api.QUALITY_LABEL[info?.quality] || (codec === 'FLAC' ? 'HQ+' : '');
@@ -464,7 +475,7 @@ function start() {
       };
 
       if (quality.size > 200) quality.clear();
-      quality.set(trackId, answer);
+      quality.set(key, answer);
       return answer;
     } catch (e) {
       log.debug('Качество трека узнать не вышло:', e.message);

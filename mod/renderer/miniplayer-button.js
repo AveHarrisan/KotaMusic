@@ -10,6 +10,7 @@ const { ipcRenderer } = require('electron');
 const MARK = 'kotamusic-miniplayer-button';
 const LOCK_MARK = 'kotamusic-miniplayer-lock';
 const UPDATE_MARK = 'kotamusic-update-button';
+const QUALITY_MARK = 'kotamusic-quality';
 const VERSION = /^\d+\.\d+\.\d+$/;
 
 // Пока плеер не нарисован, интерфейс клиента ещё собирается — до этого
@@ -78,6 +79,8 @@ let enabled = true;
 let button = null;
 let lock = null;
 let updater = null;
+let quality = null;
+let enabledQuality = true;
 let locked = false;
 
 /**
@@ -193,7 +196,7 @@ function place() {
         ? Math.round(window.innerHeight - barRect.top + 12)
         : 12;
 
-    for (const node of [button, lock, updater]) {
+    for (const node of [button, lock, updater, quality]) {
       if (!node) continue;
       node.style.bottom = `${bottom}px`;
       node.style.height = '22px';
@@ -213,7 +216,7 @@ function place() {
   const style = getComputedStyle(badge);
   const height = Math.round(rect.height);
 
-  for (const node of [button, lock, updater]) {
+  for (const node of [button, lock, updater, quality]) {
     if (!node) continue;
     node.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
     node.style.height = `${height}px`;
@@ -245,6 +248,13 @@ function placeSquares(right, size) {
     node.style.width = `${size}px`;
     node.style.padding = '0';
     right += size + GAP;
+  }
+
+  // Подпись с качеством — не квадрат: ширина по тексту.
+  if (quality && quality.textContent) {
+    quality.style.right = `${Math.round(right)}px`;
+    quality.style.width = 'auto';
+    quality.style.padding = '0 8px';
   }
 }
 
@@ -280,6 +290,7 @@ function build() {
   document.body.appendChild(button);
   buildLock();
   buildUpdater();
+  buildQuality();
   place();
 }
 
@@ -355,6 +366,89 @@ function buildUpdater() {
   document.body.appendChild(updater);
 }
 
+/**
+ * Подпись с качеством того, что играет: «HQ+: FLAC». Стоит в одном ряду
+ * с остальными нашими кнопками: в «Моей волне» другого места для неё нет.
+ */
+function buildQuality() {
+  if (document.querySelector(`[data-${QUALITY_MARK}]`)) return;
+
+  quality = document.createElement('div');
+  quality.setAttribute(`data-${QUALITY_MARK}`, '1');
+  quality.title = 'Качество трека';
+
+  quality.style.cssText =
+    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'height:22px;border-radius:6px;display:none;align-items:center;justify-content:center;' +
+    'background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);' +
+    'font-weight:600;letter-spacing:.02em;white-space:nowrap;-webkit-app-region:no-drag';
+
+  document.body.appendChild(quality);
+}
+
+/** Бегущая строка дублирует текст — берём самый короткий повтор. */
+function cleanText(node) {
+  const value = (node?.textContent || '').trim();
+  if (!value) return '';
+
+  for (let size = 1; size <= value.length / 2; size += 1) {
+    if (value.length % size) continue;
+    const piece = value.slice(0, size);
+    if (piece.repeat(value.length / size) === value) return piece;
+  }
+
+  return value;
+}
+
+/** Что играет: номер трека, а если его нет — название с исполнителем. */
+function playingTrack() {
+  const bar = document.querySelector(PLAYERBAR);
+  if (!bar) return null;
+
+  const title = cleanText(
+    bar.querySelector('[data-test-id="TRACK_TITLE"],[data-test-id="VIBE_PLAYERBAR_TRACK_NAME"]')
+  );
+  if (!title) return null;
+
+  const artists = [...bar.querySelectorAll('[data-test-id="SEPARATED_ARTIST_TITLE"]')].map(cleanText);
+  const link = bar.querySelector('a[href*="trackId="],a[href*="/track/"]');
+  const album = bar.querySelector('a[href*="albumId="],a[href*="/album/"]');
+  const href = link?.getAttribute('href') || '';
+
+  return {
+    trackId: /trackId=(\d+)/.exec(href)?.[1] || /\/track\/(\d+)/.exec(href)?.[1] || null,
+    title,
+    artist: artists.filter(Boolean).join(', '),
+    albumId: /albumId=(\d+)/.exec(album?.getAttribute('href') || '')?.[1] || null,
+  };
+}
+
+/** Спрашивает качество и пишет его в подпись. */
+async function showQuality() {
+  if (!quality) return;
+
+  const track = enabledQuality ? playingTrack() : null;
+  const key = track ? track.trackId || `${track.artist} — ${track.title}` : null;
+
+  if (!key) {
+    quality.style.display = 'none';
+    quality.textContent = '';
+    delete quality.dataset.track;
+    return;
+  }
+
+  if (quality.dataset.track === key) return;
+  quality.dataset.track = key;
+
+  const info = await ipcRenderer.invoke('kotamusic:track:quality', track);
+  if (quality.dataset.track !== key) return;
+
+  quality.textContent = info?.label || '';
+  quality.title = info?.title || 'Качество трека';
+  quality.style.display = info?.label ? 'flex' : 'none';
+  place();
+}
+
 function setLocked(value) {
   locked = Boolean(value);
 
@@ -426,6 +520,7 @@ function showHint() {
 function start() {
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
     enabled = state?.values?.miniplayerButton !== false;
+    enabledQuality = state?.values?.showTrackQuality !== false;
     if (!enabled) return;
 
     locked = Boolean(state?.values?.miniplayerLocked);
@@ -477,6 +572,10 @@ function start() {
       }).observe(document.body, { childList: true, subtree: true });
 
       window.addEventListener('resize', place);
+
+      // Подпись с качеством обновляем по времени: трек меняется сам.
+      setInterval(showQuality, 1000);
+      showQuality();
 
       // Регулятор появляется без изменений в разметке (только стили),
       // поэтому проверяем его и по времени.

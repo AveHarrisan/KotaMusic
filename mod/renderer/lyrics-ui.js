@@ -247,6 +247,13 @@ function buildButton() {
 }
 
 function start() {
+  // Пункт меню «Текст песни» просит открыть панель — он живёт в соседнем
+  // сценарии, поэтому сговариваемся через событие страницы.
+  document.addEventListener('kotamusic:lyrics:toggle', () => {
+    if (panel()) closePanel();
+    else openPanel();
+  });
+
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
     settings = state?.values || {};
 

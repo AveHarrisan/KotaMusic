@@ -21,6 +21,7 @@ function menuKind(id) {
 const MARK = 'data-kotamusic-download';
 
 const ICON_PATH = 'M12 4v11m0 0l-4-4m4 4l4-4M5 19h14';
+const LYRICS_PATH = 'M5 6h14M5 11h9M5 16h11M5 21h7';
 const FOLDER_PATH = 'M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z';
 
 /** Стрелка вниз. Рисунок строим узлами: разметкой он бы не появился. */
@@ -223,40 +224,6 @@ function buildButton() {
   anchor.parentElement.insertBefore(button, anchor);
 }
 
-/** Подпись с качеством и кодеком слева от кнопок. */
-async function showQuality() {
-  if (!settings.showTrackQuality) {
-    document.querySelector('[data-kotamusic-quality]')?.remove();
-    return;
-  }
-
-  const trackId = currentTrackId();
-  const anchor = document.querySelector(QUALITY_BUTTON);
-  if (!trackId || !anchor?.parentElement) return;
-
-  let label = document.querySelector('[data-kotamusic-quality]');
-
-  if (!label || label.parentElement !== anchor.parentElement) {
-    label?.remove();
-    label = document.createElement('span');
-    label.setAttribute('data-kotamusic-quality', '1');
-    label.style.cssText =
-      'align-self:center;margin-right:8px;font:600 11px/1 system-ui,sans-serif;' +
-      'letter-spacing:.02em;white-space:nowrap;opacity:.75;-webkit-app-region:no-drag';
-    anchor.parentElement.insertBefore(label, anchor);
-  }
-
-  if (label.dataset.track === String(trackId)) return;
-  label.dataset.track = String(trackId);
-  label.textContent = '…';
-
-  const info = await ipcRenderer.invoke('kotamusic:track:quality', trackId);
-  if (label.dataset.track !== String(trackId)) return;
-
-  label.textContent = info?.label || '';
-  label.title = info?.title || 'Качество трека';
-}
-
 /** Пункт «Скачать в файл» в открывшемся меню. */
 /** Меняет подпись пункта, не трогая значок рядом с ней. */
 function setLabel(item, text) {
@@ -335,6 +302,24 @@ function addMenuItem({ node, items }, kind) {
   // Ставим последним пунктом, после всех настоящих.
   items[items.length - 1].insertAdjacentElement('afterend', item);
 
+  // Над скачиванием — текст песни: в «Моей волне» кнопки текста нет,
+  // а посмотреть слова хочется и там.
+  if (settings.lyricsButton !== false) {
+    const words = item.cloneNode(true);
+    words.setAttribute(`${MARK}-item`, '1');
+    setLabel(words, 'Текст песни');
+    setIcon(words, LYRICS_PATH);
+
+    words.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      document.dispatchEvent(new CustomEvent('kotamusic:lyrics:toggle'));
+      document.body.click();
+    });
+
+    item.insertAdjacentElement('beforebegin', words);
+  }
+
   // Следом — «Открыть папку»: сразу после скачивания это первое,
   // что хочется сделать.
   const open = item.cloneNode(true);
@@ -369,12 +354,18 @@ function openMenu() {
   for (const node of document.querySelectorAll('div,ul,section,nav')) {
     if (bar?.contains(node) || node.hasAttribute(`${MARK}-item`)) continue;
 
+    // Окна вроде «Настроек звука» — не меню: туда наши пункты не нужны.
+    if (node.closest('[role="dialog"],[aria-modal="true"]')) continue;
+
     const rect = node.getBoundingClientRect();
-    if (rect.width < 120 || rect.width > 460 || rect.height < 100) continue;
+    if (rect.width < 140 || rect.width > 380 || rect.height < 100) continue;
 
     const items = [...node.children].filter((child) => {
       const size = child.getBoundingClientRect();
-      return child.textContent.trim() && size.height > 20 && size.height < 70;
+      if (!child.textContent.trim() || size.height < 24 || size.height > 52) return false;
+
+      // У пунктов меню всегда есть значок и короткая подпись в одну строку.
+      return Boolean(child.querySelector('svg')) && child.textContent.trim().length < 40;
     });
 
     if (items.length < 4) continue;
@@ -426,7 +417,6 @@ function start() {
     const tick = () => {
       if (settings.downloadButton !== false) buildButton();
       watchMenus();
-      showQuality();
     };
 
     new MutationObserver(tick).observe(document.body, { childList: true, subtree: true });

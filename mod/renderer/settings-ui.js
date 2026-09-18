@@ -680,7 +680,9 @@ function fill(container) {
     section('Память и кеш', [
       row(
         'Папка данных клиента',
-        config.cacheDir || 'По умолчанию — рядом с настройками клиента на системном диске',
+        config.cacheDir ||
+          'По умолчанию — рядом с настройками клиента. ⚠️ После переноса ' +
+          'клиент может попросить войти заново',
         actionButton('Обзор', async () => {
           const chosen = await ipcRenderer.invoke('kotamusic:cache:choose');
           if (chosen) render();
