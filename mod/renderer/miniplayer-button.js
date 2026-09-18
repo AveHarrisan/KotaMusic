@@ -416,9 +416,14 @@ function openSoundSettings() {
   const look = setInterval(() => {
     tries += 1;
 
-    const item = [...document.querySelectorAll('button,[role="menuitem"]')].find((node) =>
-      /Настройки звука/i.test(node.textContent || '')
-    );
+    const item = [...document.querySelectorAll('button,[role="menuitem"]')].find((node) => {
+      if (!/Настройки звука/i.test(node.textContent || '')) return false;
+
+      // Пункт должен быть видимым и небольшим: такой же текст встречается
+      // и в скрытых кусках разметки, нажатие по ним ничего не даёт.
+      const rect = node.getBoundingClientRect();
+      return rect.width > 60 && rect.height > 20 && rect.height < 70;
+    });
 
     if (item) {
       clearInterval(look);
@@ -561,6 +566,10 @@ function showHint() {
 }
 
 function start() {
+  // Проверка вёрстки: открыть настройки звука без мыши. Подписываемся
+  // сразу, иначе команда придёт раньше, чем мы будем готовы её услышать.
+  ipcRenderer.on('kotamusic:ui:sound', openSoundSettings);
+
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {
     enabled = state?.values?.miniplayerButton !== false;
     enabledQuality = state?.values?.showTrackQuality !== false;
@@ -623,6 +632,7 @@ function start() {
       // Регулятор появляется без изменений в разметке (только стили),
       // поэтому проверяем его и по времени.
       setInterval(dodgeVolume, 300);
+
     }, 200);
   });
 }

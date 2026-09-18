@@ -439,6 +439,15 @@ function selfTest() {
 function start() {
   selfTest();
 
+  // Проверка вёрстки без мыши: окно само откроет настройки звука.
+  if (process.env.KOTAMUSIC_UI_TEST === 'sound') {
+    setTimeout(() => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send('kotamusic:ui:sound');
+      }
+    }, 9000);
+  }
+
   ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) =>
     enqueue(async () => {
       try {

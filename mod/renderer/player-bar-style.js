@@ -29,19 +29,29 @@ const RULES = {
   `,
 };
 
+// Правки, которые нужны всегда, без настроек.
+const BASE = `
+  /* Окно «Настройки звука» выезжает вплотную к нижнему краю и накрывает
+     ряд кнопок мода в углу. Поднимаем окно целиком — вместе с обёрткой,
+     иначе у карточки подрезается заголовок. */
+  :has(> [class*="QualitySettingsModal"]) { transform: translateY(-40px); }
+`;
+
 let values = {};
 
 function apply() {
   if (!document.head) return;
 
-  const css = Object.entries(RULES)
-    .filter(([setting]) => values[setting])
-    .map(([, rule]) => rule)
-    .join('\n');
+  const css = [
+    BASE,
+    ...Object.entries(RULES)
+      .filter(([setting]) => values[setting])
+      .map(([, rule]) => rule),
+  ].join('\n');
 
   let style = document.getElementById(STYLE_ID);
 
-  if (!css) {
+  if (!css.trim()) {
     style?.remove();
     return;
   }
