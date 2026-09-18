@@ -198,13 +198,13 @@ function place() {
 
     for (const node of [button, lock, updater, quality]) {
       if (!node) continue;
-      node.style.bottom = `${liftValue || bottom}px`;
+      node.style.bottom = `${bottom}px`;
       node.style.height = '22px';
       node.style.borderRadius = '11px';
       node.style.font = '';
     }
 
-    button.style.right = '12px';
+    button.style.right = `${12}px`;
     button.style.paddingLeft = '12px';
     button.style.paddingRight = '12px';
 
@@ -218,7 +218,7 @@ function place() {
 
   for (const node of [button, lock, updater, quality]) {
     if (!node) continue;
-    node.style.bottom = `${liftValue || Math.round(window.innerHeight - rect.bottom)}px`;
+    node.style.bottom = `${Math.round(window.innerHeight - rect.bottom)}px`;
     node.style.height = `${height}px`;
 
     // Скругление как у плашки, но не меньше полной «таблетки».
@@ -268,7 +268,7 @@ function build() {
   button.title = 'Открыть или закрыть мини-плеер';
 
   button.style.cssText =
-    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'position:fixed;right:12px;bottom:12px;z-index:2147483647;' +
     'height:22px;padding:0 12px;border-radius:6px;white-space:nowrap;' +
     'display:flex;align-items:center;justify-content:center;' +
     'border:none;background:rgba(255,255,255,.1);cursor:pointer;' +
@@ -303,7 +303,7 @@ function buildLock() {
   lock.type = 'button';
 
   lock.style.cssText =
-    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'position:fixed;right:12px;bottom:12px;z-index:2147483647;' +
     'height:22px;border-radius:6px;' +
     'display:flex;align-items:center;justify-content:center;' +
     'border:none;background:rgba(255,255,255,.1);cursor:pointer;' +
@@ -335,7 +335,7 @@ function buildUpdater() {
   updater.innerHTML = UPDATE_ICON;
 
   updater.style.cssText =
-    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'position:fixed;right:12px;bottom:12px;z-index:2147483647;' +
     'height:22px;border-radius:6px;' +
     'display:flex;align-items:center;justify-content:center;' +
     'border:none;background:rgba(255,255,255,.1);cursor:pointer;' +
@@ -389,7 +389,7 @@ function buildQuality() {
   quality.addEventListener('mouseleave', () => (quality.style.background = 'rgba(255,255,255,.1)'));
 
   quality.style.cssText =
-    'position:fixed;right:12px;bottom:12px;z-index:2147483646;' +
+    'position:fixed;right:12px;bottom:12px;z-index:2147483647;' +
     'height:22px;border-radius:6px;display:none;align-items:center;justify-content:center;' +
     'background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);' +
     'font-weight:600;letter-spacing:.02em;white-space:nowrap;-webkit-app-region:no-drag';
@@ -403,62 +403,22 @@ function buildQuality() {
  * кнопка, а в «Моей волне» — только пункт в меню, поэтому там открываем
  * меню и нажимаем нужный пункт.
  */
-let liftValue = 0; // на сколько ряд поднят над окном клиента
-let resting = null; // где ряд стоит, когда его ничто не накрывает
 
 /**
  * Окна клиента — например «Настройки звука» — выезжают снизу и накрывают
  * наш ряд. Тогда поднимаем ряд над окном: кнопки должны быть видны.
  */
-function liftAboveDialogs() {
+function dodgeDialogs() {
   const nodes = [button, lock, updater, quality].filter(Boolean);
   if (!nodes.length) return;
 
-  // Ряд меряем целиком: окно может накрыть только его левый край.
-  const boxes = nodes.map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0);
-  if (!boxes.length) return;
-
-  const now = {
-    left: Math.min(...boxes.map((rect) => rect.left)),
-    right: Math.max(...boxes.map((rect) => rect.right)),
-    top: Math.min(...boxes.map((rect) => rect.top)),
-    bottom: Math.max(...boxes.map((rect) => rect.bottom)),
-  };
-
-  // Пока ряд не поднят, запоминаем его обычное место. Дальше сверяемся
-  // именно с ним: поднятый ряд окно уже не задевает, и без этого он
-  // опускался бы обратно, снова попадал под окно и так без конца.
-  if (!liftValue) resting = now;
-
-  const row = resting || now;
-
-  const pageArea = window.innerWidth * window.innerHeight;
-  let lift = 0;
-
-  for (const node of document.querySelectorAll('div,section,aside')) {
-    if (nodes.includes(node) || nodes.some((mine) => node.contains(mine))) continue;
-
-    const rect = node.getBoundingClientRect();
-    if (rect.height < 120 || rect.width < 160) continue;
-
-    // Страницу целиком и её крупные части за окно не считаем.
-    if (rect.width * rect.height > pageArea * 0.55) continue;
-
-    const style = getComputedStyle(node);
-    if (style.position !== 'fixed' && style.position !== 'absolute') continue;
-    if (!visible(node)) continue;
-
-    if (rect.bottom < row.top || rect.top > row.bottom) continue;
-    if (rect.right < row.left || rect.left > row.right) continue;
-
-    lift = Math.max(lift, Math.round(window.innerHeight - rect.top + 8));
-  }
-
-  // Пересобираем ряд, только когда высота подъёма и правда изменилась:
-  // иначе он прыгал бы между своим местом и поднятым.
-  if (lift !== liftValue) {
-    liftValue = lift;
-    place();
+  // Окна клиента рисуются поверх нашего ряда, хотя слой у нас самый
+  // верхний: при равных слоях выигрывает тот, кто в разметке ниже.
+  // Поэтому держим свои кнопки последними в теле страницы.
+  for (const node of nodes) {
+    if (node.parentElement === document.body && node.nextElementSibling) {
+      document.body.appendChild(node);
+    }
   }
 }
 
@@ -612,7 +572,7 @@ function showToast(message) {
   const toast = document.createElement('div');
   toast.setAttribute('data-kotamusic-toast', '1');
   toast.style.cssText =
-    'position:fixed;right:12px;bottom:48px;z-index:2147483646;max-width:260px;' +
+    'position:fixed;right:12px;bottom:48px;z-index:2147483647;max-width:260px;' +
     'padding:12px 14px;border-radius:12px;background:#2a2a2a;color:#fff;' +
     'font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);' +
     'opacity:0;transition:opacity .2s;-webkit-app-region:no-drag';
@@ -635,7 +595,7 @@ function showHint() {
   const hint = document.createElement('div');
   hint.setAttribute('data-kotamusic-hint', '1');
   hint.style.cssText =
-    'position:fixed;right:12px;bottom:48px;z-index:2147483646;max-width:250px;' +
+    'position:fixed;right:12px;bottom:48px;z-index:2147483647;max-width:250px;' +
     'padding:12px 14px;border-radius:12px;background:#2a2a2a;color:#fff;' +
     'font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);' +
     'opacity:0;transition:opacity .2s;-webkit-app-region:no-drag';
@@ -739,7 +699,7 @@ function start() {
       // поэтому проверяем его и по времени.
       setInterval(() => {
         dodgeVolume();
-        liftAboveDialogs();
+        dodgeDialogs();
       }, 300);
 
 
