@@ -32,6 +32,7 @@ const DEFAULTS = {
   downloadAlbumFolder: true,
   // Спрашивать перед каждым скачиванием, куда класть.
   downloadAsk: false,
+  downloadParallel: 3,
 
   // Своя папка для данных клиента: кеш и скачанное в самом клиенте.
   cacheDir: '',

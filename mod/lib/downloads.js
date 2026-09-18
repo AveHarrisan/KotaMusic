@@ -20,14 +20,54 @@ const log = require('./log');
 
 const CHANNEL_PROGRESS = 'kotamusic:download:progress';
 
-// Сколько треков качаем одновременно: столько же берёт клиент.
-const PARALLEL = 3;
+// Сколько треков качаем одновременно. По умолчанию столько же, сколько
+// берёт сам клиент; на слабом интернете полезно опустить до одного.
+const PARALLEL_DEFAULT = 3;
+
+function parallelCount() {
+  const asked = Number(settings.get().downloadParallel);
+  if (!Number.isFinite(asked)) return PARALLEL_DEFAULT;
+  return Math.max(1, Math.min(5, Math.round(asked)));
+}
 
 // Доля прогресса, которая приходится на саму загрузку; остальное —
 // на теги и обложку.
 const DOWNLOAD_SHARE = 0.9;
 
 let queue = Promise.resolve();
+
+// Остановка по просьбе человека. Каждая идущая загрузка кладёт сюда свой
+// обрыватель, а ожидающие в очереди сами проверяют признак и не начинают.
+let stopping = false;
+const running = new Set();
+
+/** Прерывает всё, что качается и ждёт очереди. */
+function stopAll() {
+  if (!running.size && !queue) return false;
+
+  stopping = true;
+  for (const breaker of running) {
+    try {
+      breaker.abort();
+    } catch {
+      // уже завершилась — и хорошо
+    }
+  }
+
+  running.clear();
+  log.info('Скачивание остановлено человеком');
+  return true;
+}
+
+/** Новая просьба скачать: прежний запрет на работу снимаем. */
+function startFresh() {
+  stopping = false;
+}
+
+/** Ошибка из-за нашей же остановки, а не беда. */
+function isStop(error) {
+  return stopping || error?.name === 'AbortError';
+}
 
 // Скорость считаем по всем загрузкам разом: показываем одну общую,
 // а не по треку — так понятнее, когда качается альбом в три потока.
@@ -140,7 +180,18 @@ function decryptor(keyHex) {
 
 /** Скачивает один файл, сообщая долю. */
 async function fetchToFile(url, destination, keyHex, onProgress) {
-  const response = await fetch(url);
+  const breaker = new AbortController();
+  running.add(breaker);
+
+  try {
+    await fetchToFileInner(url, destination, keyHex, onProgress, breaker.signal);
+  } finally {
+    running.delete(breaker);
+  }
+}
+
+async function fetchToFileInner(url, destination, keyHex, onProgress, signal) {
+  const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`Файл: HTTP ${response.status}`);
 
   const total = Number(response.headers.get('content-length')) || 0;
@@ -157,7 +208,7 @@ async function fetchToFile(url, destination, keyHex, onProgress) {
   if (keyHex) parts.push(decryptor(keyHex));
   parts.push(fs.createWriteStream(destination));
 
-  await pipeline(parts);
+  await pipeline(parts, { signal });
 }
 
 /** Сообщение о ходе дела в окно клиента. */
@@ -252,7 +303,13 @@ async function downloadTrack(track, { dir, mp3, onProgress } = {}) {
   const file = path.join(folder, fileNameFor(track, info.codec));
   const temporary = `${file}.part`;
 
-  await fetchToFile(info.url, temporary, info.key, onProgress);
+  try {
+    await fetchToFile(info.url, temporary, info.key, onProgress);
+  } catch (e) {
+    // Недокачанный кусок не оставляем: иначе папка зарастает «.part».
+    fs.rmSync(temporary, { force: true });
+    throw e;
+  }
 
   // Обложку и подписи вшиваем в сам файл, чтобы он выглядел прилично
   // в любой программе, а не только в проводнике рядом с папкой.
@@ -318,6 +375,11 @@ async function single(trackId, { dir = null, force = false } = {}) {
     log.info('Скачан трек:', file);
     return { file };
   } catch (e) {
+    if (isStop(e)) {
+      report({ id: 'single', title, done: true, stopped: true });
+      return { stopped: true };
+    }
+
     report({ id: 'single', title, done: true, error: e.message });
     throw e;
   }
@@ -355,6 +417,8 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
 
   const worker = async () => {
     while (index < tracks.length) {
+      if (stopping) return;
+
       const current = tracks[index];
       index += 1;
 
@@ -376,6 +440,8 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
           },
         });
       } catch (e) {
+        if (isStop(e)) return;
+
         errors.push(`${current.title}: ${e.message}`);
         log.warn('Трек не скачался:', current.title, e.message);
       }
@@ -386,10 +452,18 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(PARALLEL, tracks.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(parallelCount(), tracks.length) }, worker));
+
+  const saved = finished - errors.length - skipped;
+
+  if (stopping) {
+    report({ id: 'many', title, done: true, stopped: true, folder, saved });
+    log.info(`Остановлено: успело скачаться ${saved} из ${total}: ${folder}`);
+    return { folder, total, saved, stopped: true, failed: errors.length, skipped };
+  }
 
   report({ id: 'many', title, share: 1, done: true, folder, errors: errors.length, skipped });
-  log.info(`Скачано ${finished - errors.length - skipped} из ${total} (уже было: ${skipped}): ${folder}`);
+  log.info(`Скачано ${saved} из ${total} (уже было: ${skipped}): ${folder}`);
 
   return { folder, total, failed: errors.length, skipped };
 }
@@ -461,8 +535,9 @@ function start() {
     }, 3000);
   }
 
-  ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) =>
-    enqueue(async () => {
+  ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) => {
+    startFresh();
+    return enqueue(async () => {
       try {
         // Первое скачивание: спросим, где держать музыку.
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
@@ -476,13 +551,14 @@ function start() {
         notice.show(`Не удалось скачать трек: ${e.message}`);
         return { ok: false, error: e.message };
       }
-    })
-  );
+    });
+  });
 
   // В «Моей волне» ссылки на трек нет вовсе, поэтому туда приходят
   // название с исполнителем — трек находим сами.
-  ipcMain.handle('kotamusic:download:current', async (_event, about) =>
-    enqueue(async () => {
+  ipcMain.handle('kotamusic:download:current', async (_event, about) => {
+    startFresh();
+    return enqueue(async () => {
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -498,11 +574,12 @@ function start() {
         notice.show(`Не удалось скачать трек: ${e.message}`);
         return { ok: false, error: e.message };
       }
-    })
-  );
+    });
+  });
 
-  ipcMain.handle('kotamusic:download:album', async (_event, albumId, options = {}) =>
-    enqueue(async () => {
+  ipcMain.handle('kotamusic:download:album', async (_event, albumId, options = {}) => {
+    startFresh();
+    return enqueue(async () => {
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -514,11 +591,12 @@ function start() {
         notice.show(`Не удалось скачать альбом: ${e.message}`);
         return { ok: false, error: e.message };
       }
-    })
-  );
+    });
+  });
 
-  ipcMain.handle('kotamusic:download:playlist', async (_event, owner, kind, options = {}) =>
-    enqueue(async () => {
+  ipcMain.handle('kotamusic:download:playlist', async (_event, owner, kind, options = {}) => {
+    startFresh();
+    return enqueue(async () => {
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -533,8 +611,8 @@ function start() {
         notice.show(`Не удалось скачать плейлист: ${e.message}`);
         return { ok: false, error: e.message };
       }
-    })
-  );
+    });
+  });
 
   // Качество и кодек: спрашиваем у того же API, что и ссылку на файл,
   // и держим ответ в памяти — на один трек одного запроса достаточно.
@@ -586,6 +664,9 @@ function start() {
 
     return result.canceled || !result.filePaths.length ? null : result.filePaths[0];
   });
+
+  // Остановить всё, что качается: и то, что уже идёт, и очередь.
+  ipcMain.handle('kotamusic:download:stop', () => ({ ok: stopAll() }));
 
   ipcMain.handle('kotamusic:download:folder', () => {
     shell.openPath(targetDir());

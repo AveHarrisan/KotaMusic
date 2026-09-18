@@ -242,17 +242,18 @@ async function downloadTrackById(trackId) {
   const where = await whereTo('track');
   if (!where) return;
 
-  toast('Скачиваю…', { progress: 0 });
   let result = await ipcRenderer.invoke('kotamusic:download:track', trackId, where);
 
   if (result?.exists) {
+    // Вопрос про уже скачанный файл приходит раньше самой загрузки,
+    // поэтому «Скачиваю…» показываем только когда она правда началась.
     if (!(await askAgain(result))) return toast('Оставил как есть');
 
-    toast('Скачиваю заново…', { progress: 0 });
+    toast('Скачиваю заново…', { progress: 0, actions: stopAction() });
     result = await ipcRenderer.invoke('kotamusic:download:track', trackId, { ...where, force: true });
   }
 
-  if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
+  if (!result?.ok && !result?.stopped) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
 }
 
 /** Скачать то, что играет: по номеру, а если его нет — по названию. */
@@ -268,26 +269,50 @@ async function downloadCurrent() {
       ? ipcRenderer.invoke('kotamusic:download:track', about.trackId, options)
       : ipcRenderer.invoke('kotamusic:download:current', { track: about, options });
 
-  toast('Скачиваю…', { progress: 0 });
   let result = await run(where);
 
   if (result?.exists) {
     if (!(await askAgain(result))) return toast('Оставил как есть');
 
-    toast('Скачиваю заново…', { progress: 0 });
+    toast('Скачиваю заново…', { progress: 0, actions: stopAction() });
     result = await run({ ...where, force: true });
   }
 
   if (!result?.ok) toast(`Не вышло: ${result?.error || 'неизвестная ошибка'}`);
 }
 
-/** Кнопка в панели плеера — рядом с выбором качества. */
-function buildButton() {
-  const bar = document.querySelector(BAR);
-  if (!bar) return;
+/**
+ * Кнопка в панели плеера.
+ *
+ * В обычной панели она встаёт рядом с выбором качества. В «Моей волне»
+ * такой кнопки у клиента нет вовсе, поэтому там становимся слева от «…»:
+ * раньше в «Моей волне» кнопки не появлялось совсем и скачивать можно
+ * было только из меню.
+ */
+function whereToPut() {
+  const quality = document.querySelector(QUALITY_BUTTON);
+  if (quality?.parentElement) return { anchor: quality, sample: quality };
 
-  const anchor = document.querySelector(QUALITY_BUTTON);
-  if (!anchor || !anchor.parentElement) return;
+  const bar = document.querySelector('[data-test-id="VIBE_PLAYERBAR"]');
+  const menu = bar?.querySelector('[data-test-id="VIBE_CONTEXT_MENU_BUTTON"]');
+  if (!menu?.parentElement) return null;
+
+  // За образец берём «нравится»: у неё тот же размер и поведение,
+  // а у «…» внутри лишние признаки открывающегося меню.
+  const like = bar.querySelector('[data-test-id="LIKE_BUTTON"]') || menu;
+  return { anchor: menu, sample: like };
+}
+
+function buildButton() {
+  const place = whereToPut();
+  if (!place) {
+    // Панель сменилась и якоря больше нет — свою кнопку убираем,
+    // иначе она повиснет в чужом месте.
+    document.querySelector(`[${MARK}]`)?.remove();
+    return;
+  }
+
+  const { anchor, sample } = place;
 
   const shown = document.querySelector(`[${MARK}]`);
   if (shown && shown.parentElement === anchor.parentElement) return;
@@ -295,11 +320,23 @@ function buildButton() {
 
   // Берём соседнюю кнопку целиком: так наша совпадёт по размеру,
   // отступам и поведению при наведении, чем бы их клиент ни задавал.
-  const button = anchor.cloneNode(true);
+  const button = sample.cloneNode(true);
   button.setAttribute(MARK, '1');
   button.removeAttribute('data-test-id');
   button.removeAttribute('aria-haspopup');
   button.removeAttribute('aria-expanded');
+  button.removeAttribute('aria-checked');
+
+  // ⚠️Образец мог быть выключен (в «Моей волне» «нравится» временами
+  // неактивна). Выключенная кнопка не отдаёт нажатий вовсе — снимаем
+  // признак, иначе наша кнопка видна, но мертва.
+  button.disabled = false;
+  button.removeAttribute('disabled');
+  button.removeAttribute('aria-disabled');
+  button.style.opacity = '';
+  button.style.pointerEvents = 'auto';
+  button.style.cursor = 'pointer';
+
   button.title = 'Скачать трек в файл';
   button.setAttribute('aria-label', 'Скачать трек в файл');
   button.replaceChildren(iconNode());
@@ -356,6 +393,13 @@ function addMenuItem({ node, items }, kind, from) {
   const item = sample.cloneNode(true);
   item.setAttribute(`${MARK}-item`, '1');
   item.removeAttribute('data-test-id');
+  item.removeAttribute('aria-haspopup');
+  item.removeAttribute('aria-expanded');
+
+  // У пункта-образца справа могла быть стрелка подменю. Наши пункты ничего
+  // не раскрывают, а со стрелкой выглядели так, будто раскрывают.
+  const pictures = item.querySelectorAll('svg');
+  for (let i = 1; i < pictures.length; i += 1) pictures[i].remove();
 
   // Если за образец взяли не «Скачать», значок у клона чужой — рисуем свой.
   if (!/^Скачать/i.test(sample.textContent.trim())) setIcon(item, ICON_PATH);
@@ -371,14 +415,14 @@ function addMenuItem({ node, items }, kind, from) {
     if (kind === 'album' && ids.albumId) {
       const where = await whereTo('album');
       if (where) {
-        toast('Скачиваю альбом…', { progress: 0 });
+        toast('Собираю список альбома…', { progress: 0, actions: stopAction() });
         const result = await ipcRenderer.invoke('kotamusic:download:album', ids.albumId, where);
         if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
       }
     } else if (kind === 'playlist' && (ids.uuid || (ids.owner && ids.kind))) {
       const where = await whereTo('playlist');
       if (where) {
-        toast('Скачиваю плейлист…', { progress: 0 });
+        toast('Собираю список плейлиста…', { progress: 0, actions: stopAction() });
         const result = await ipcRenderer.invoke(
           'kotamusic:download:playlist',
           ids.uuid ? 'uuid' : ids.owner,
@@ -440,7 +484,7 @@ function addMenuItem({ node, items }, kind, from) {
 }
 
 /** Короткое сообщение в углу — своё, чтобы не спорить с клиентом. */
-function toast(text, { progress = null, id = 'kotamusic-toast' } = {}) {
+function toast(text, { progress = null, id = 'kotamusic-toast', actions = null } = {}) {
   let box = document.querySelector(`[data-kotamusic-progress="${id}"]`);
 
   if (!box) {
@@ -452,9 +496,21 @@ function toast(text, { progress = null, id = 'kotamusic-toast' } = {}) {
       'background:#2a2a2a;color:#fff;font:13px/1.35 system-ui,sans-serif;' +
       'box-shadow:0 8px 24px rgba(0,0,0,.45);-webkit-app-region:no-drag';
 
+    const row = document.createElement('div');
+    row.setAttribute('data-role', 'row');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px';
+
     const label = document.createElement('div');
     label.setAttribute('data-role', 'label');
-    box.appendChild(label);
+    label.style.cssText = 'flex:1;min-width:0';
+    row.appendChild(label);
+
+    const buttons = document.createElement('div');
+    buttons.setAttribute('data-role', 'buttons');
+    buttons.style.cssText = 'display:flex;gap:6px;flex:none';
+    row.appendChild(buttons);
+
+    box.appendChild(row);
 
     const track = document.createElement('div');
     track.setAttribute('data-role', 'track');
@@ -472,6 +528,33 @@ function toast(text, { progress = null, id = 'kotamusic-toast' } = {}) {
 
   box.querySelector('[data-role="label"]').textContent = text;
 
+  // Кнопки пересобираем, только когда они поменялись: иначе нажатие
+  // не успевало бы сработать — сообщение обновляется несколько раз в секунду.
+  const buttons = box.querySelector('[data-role="buttons"]');
+  const names = (actions || []).map((item) => item.label).join('|');
+
+  if (buttons.dataset.names !== names) {
+    buttons.dataset.names = names;
+    buttons.replaceChildren();
+
+    for (const item of actions || []) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = item.label;
+      button.style.cssText =
+        'padding:5px 10px;border-radius:8px;cursor:pointer;font:600 12px system-ui,sans-serif;' +
+        'border:1px solid rgba(255,255,255,.22);background:transparent;color:inherit';
+
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        item.run();
+      });
+
+      buttons.appendChild(button);
+    }
+  }
+
   const track = box.querySelector('[data-role="track"]');
   const fill = box.querySelector('[data-role="fill"]');
 
@@ -480,10 +563,42 @@ function toast(text, { progress = null, id = 'kotamusic-toast' } = {}) {
 
   clearTimeout(box.dataset.timer);
   if (progress === null) {
-    box.dataset.timer = setTimeout(() => box.remove(), 4000);
+    box.dataset.timer = setTimeout(() => box.remove(), actions?.length ? 8000 : 4000);
   }
 
   return box;
+}
+
+/** Убирает сообщение сразу, не дожидаясь срока. */
+function hideToast(id = 'kotamusic-toast') {
+  const box = document.querySelector(`[data-kotamusic-progress="${id}"]`);
+  if (box) {
+    clearTimeout(box.dataset.timer);
+    box.remove();
+  }
+}
+
+/** Кнопка «Остановить» рядом с ходом дела. */
+function stopAction() {
+  return [
+    {
+      label: 'Остановить',
+      run: () => {
+        ipcRenderer.invoke('kotamusic:download:stop');
+        toast('Останавливаю…');
+      },
+    },
+  ];
+}
+
+/** Кнопка «Открыть папку» под готовым скачиванием. */
+function folderAction() {
+  return [
+    {
+      label: 'Открыть папку',
+      run: () => ipcRenderer.invoke('kotamusic:download:folder'),
+    },
+  ];
 }
 
 /**
@@ -616,13 +731,23 @@ function start() {
 
     if (state.error) return toast(`Не вышло: ${state.error}`);
 
+    if (state.stopped) {
+      toast(
+        state.saved ? `Остановил. Успело скачаться: ${state.saved}` : 'Остановил, ничего не скачано',
+        { actions: state.saved ? folderAction() : null }
+      );
+      return;
+    }
+
     if (state.done) {
-      toast(state.folder ? `Готово: ${state.folder}` : `Скачано: ${state.title}`);
+      toast(state.folder ? `Готово: ${state.folder}` : `Скачано: ${state.title}`, {
+        actions: folderAction(),
+      });
       return;
     }
 
     const parts = [state.title, state.text, state.speed].filter(Boolean);
-    toast(`Скачиваю: ${parts.join(' · ')}`, { progress: state.share || 0 });
+    toast(`Скачиваю: ${parts.join(' · ')}`, { progress: state.share || 0, actions: stopAction() });
   });
 
   ipcRenderer.invoke('kotamusic:settings:get').then((state) => {

@@ -425,8 +425,19 @@ function linkButton(label, url) {
   return node;
 }
 
-function row(title, description, control) {
-  const wrap = el('div', 'display:flex;align-items:center;gap:16px;padding:12px 0');
+/**
+ * Строка настройки. `stacked` уводит управление под подпись: когда кнопок
+ * много или в поле длинный путь, в одну строку они выдавливали подпись
+ * в узкий столбик и она переносилась по одному слову.
+ */
+function row(title, description, control, { stacked = false } = {}) {
+  const wrap = el(
+    'div',
+    stacked
+      ? 'display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:12px 0'
+      : 'display:flex;align-items:center;gap:16px;padding:12px 0'
+  );
+
   const texts = el('div', 'flex:1;min-width:0');
 
   texts.appendChild(el('div', 'font-size:15px;font-weight:500', title));
@@ -442,6 +453,14 @@ function row(title, description, control) {
     // размер папки. Помечаем её, чтобы найти потом.
     node.setAttribute('data-role', 'description');
     texts.appendChild(node);
+  }
+
+  if (stacked) {
+    control.style.flexWrap = 'wrap';
+    control.style.flex = 'none';
+    // Поле с путём под подписью тянем во всю ширину: иначе длинный путь
+    // виден огрызком вроде «C:\\Users\\Harrisan\\Music\\Kot».
+    if (control.tagName === 'INPUT') control.style.width = '100%';
   }
 
   wrap.append(texts, control);
@@ -627,7 +646,8 @@ function fill(container) {
       row(
         'Своя папка',
         'Можно указать путь руками',
-        textField(config.downloadDir, (value) => update({ downloadDir: value }))
+        textField(config.downloadDir, (value) => update({ downloadDir: value })),
+        { stacked: true }
       ),
       row(
         'Альбом и плейлист — в свою папку',
@@ -638,6 +658,16 @@ function fill(container) {
         'Спрашивать перед каждым скачиванием',
         'Окно с выбором: в общую папку, в папку альбома или в другую',
         toggle(config.downloadAsk, (value) => update({ downloadAsk: value }))
+      ),
+      row(
+        'Сколько качать разом',
+        'Больше — быстрее, но тяжелее для интернета',
+        choice(
+          [[1, 'По одному'], [3, 'Три'], [5, 'Пять']],
+          config.downloadParallel ?? 3,
+          (value) => update({ downloadParallel: value })
+        ),
+        { stacked: true }
       ),
       row(
         'Скачивать в MP3',
@@ -678,7 +708,8 @@ function fill(container) {
           [[13, 'Мелкий'], [15, 'Обычный'], [18, 'Крупный'], [22, 'Очень крупный']],
           config.lyricsFontSize,
           (value) => update({ lyricsFontSize: value })
-        )
+        ),
+        { stacked: true }
       ),
       row(
         'Искать в LRCLib',
