@@ -404,6 +404,7 @@ function buildQuality() {
  * меню и нажимаем нужный пункт.
  */
 let liftValue = 0; // на сколько ряд поднят над окном клиента
+let resting = null; // где ряд стоит, когда его ничто не накрывает
 
 /**
  * Окна клиента — например «Настройки звука» — выезжают снизу и накрывают
@@ -413,15 +414,35 @@ function liftAboveDialogs() {
   const nodes = [button, lock, updater, quality].filter(Boolean);
   if (!nodes.length) return;
 
-  const row = nodes[0].getBoundingClientRect();
+  // Ряд меряем целиком: окно может накрыть только его левый край.
+  const boxes = nodes.map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0);
+  if (!boxes.length) return;
+
+  const now = {
+    left: Math.min(...boxes.map((rect) => rect.left)),
+    right: Math.max(...boxes.map((rect) => rect.right)),
+    top: Math.min(...boxes.map((rect) => rect.top)),
+    bottom: Math.max(...boxes.map((rect) => rect.bottom)),
+  };
+
+  // Пока ряд не поднят, запоминаем его обычное место. Дальше сверяемся
+  // именно с ним: поднятый ряд окно уже не задевает, и без этого он
+  // опускался бы обратно, снова попадал под окно и так без конца.
+  if (!liftValue) resting = now;
+
+  const row = resting || now;
+
+  const pageArea = window.innerWidth * window.innerHeight;
   let lift = 0;
 
   for (const node of document.querySelectorAll('div,section,aside')) {
-    if (nodes.includes(node)) continue;
+    if (nodes.includes(node) || nodes.some((mine) => node.contains(mine))) continue;
 
     const rect = node.getBoundingClientRect();
-    if (rect.height < 150 || rect.width < 200) continue;
-    if (rect.height > window.innerHeight * 0.9 || rect.width > window.innerWidth * 0.9) continue;
+    if (rect.height < 120 || rect.width < 160) continue;
+
+    // Страницу целиком и её крупные части за окно не считаем.
+    if (rect.width * rect.height > pageArea * 0.55) continue;
 
     const style = getComputedStyle(node);
     if (style.position !== 'fixed' && style.position !== 'absolute') continue;
