@@ -344,7 +344,7 @@ function setIcon(item, shape) {
   picture.appendChild(path);
 }
 
-function addMenuItem({ node, items }, kind) {
+function addMenuItem({ node, items }, kind, from) {
   if (node.querySelector(`[${MARK}-item]`)) return;
 
   // Клонируем настоящий пункт меню: так наш получает и значок, и отступы,
@@ -366,7 +366,7 @@ function addMenuItem({ node, items }, kind) {
     event.preventDefault();
     event.stopPropagation();
 
-    const ids = kind === 'track' ? { trackId: currentMenuTrackId() } : targetIds();
+    const ids = kind === 'track' ? { trackId: currentMenuTrackId(from) } : targetIds(from);
 
     if (kind === 'album' && ids.albumId) {
       const where = await whereTo('album');
@@ -375,18 +375,21 @@ function addMenuItem({ node, items }, kind) {
         const result = await ipcRenderer.invoke('kotamusic:download:album', ids.albumId, where);
         if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
       }
-    } else if (kind === 'playlist' && ids.owner && ids.kind) {
+    } else if (kind === 'playlist' && (ids.uuid || (ids.owner && ids.kind))) {
       const where = await whereTo('playlist');
       if (where) {
         toast('Скачиваю плейлист…', { progress: 0 });
         const result = await ipcRenderer.invoke(
           'kotamusic:download:playlist',
-          ids.owner,
-          ids.kind,
+          ids.uuid ? 'uuid' : ids.owner,
+          ids.uuid || ids.kind,
           where
         );
         if (!result?.ok) toast(`Не вышло: ${result?.error || 'ошибка'}`);
       }
+    } else if (kind !== 'track') {
+      // Раньше здесь молча качался играющий трек — не то, чего просили.
+      toast(kind === 'album' ? 'Не понял, какой альбом скачивать' : 'Не понял, какой плейлист скачивать');
     } else if (ids.trackId) {
       await downloadTrackById(ids.trackId);
     } else {
@@ -436,9 +439,122 @@ function addMenuItem({ node, items }, kind) {
 
 }
 
+/** Короткое сообщение в углу — своё, чтобы не спорить с клиентом. */
+function toast(text, { progress = null, id = 'kotamusic-toast' } = {}) {
+  let box = document.querySelector(`[data-kotamusic-progress="${id}"]`);
+
+  if (!box) {
+    box = document.createElement('div');
+    box.setAttribute('data-kotamusic-progress', id);
+    box.style.cssText =
+      'position:fixed;left:50%;transform:translateX(-50%);bottom:92px;z-index:2147483646;' +
+      'min-width:260px;max-width:min(520px,90vw);padding:10px 14px;border-radius:12px;' +
+      'background:#2a2a2a;color:#fff;font:13px/1.35 system-ui,sans-serif;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.45);-webkit-app-region:no-drag';
+
+    const label = document.createElement('div');
+    label.setAttribute('data-role', 'label');
+    box.appendChild(label);
+
+    const track = document.createElement('div');
+    track.setAttribute('data-role', 'track');
+    track.style.cssText =
+      'margin-top:8px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden';
+
+    const fill = document.createElement('div');
+    fill.setAttribute('data-role', 'fill');
+    fill.style.cssText = 'height:100%;width:0;background:#ffdb4d;transition:width .2s';
+
+    track.appendChild(fill);
+    box.appendChild(track);
+    document.body.appendChild(box);
+  }
+
+  box.querySelector('[data-role="label"]').textContent = text;
+
+  const track = box.querySelector('[data-role="track"]');
+  const fill = box.querySelector('[data-role="fill"]');
+
+  track.style.display = progress === null ? 'none' : '';
+  if (progress !== null) fill.style.width = `${Math.round(progress * 100)}%`;
+
+  clearTimeout(box.dataset.timer);
+  if (progress === null) {
+    box.dataset.timer = setTimeout(() => box.remove(), 4000);
+  }
+
+  return box;
+}
+
+/**
+ * Что лежит под кнопкой, которой открыли меню: альбом, плейлист или трек.
+ *
+ * ⚠️Искать ссылку «где-нибудь выше по дереву» нельзя: поднявшись до общего
+ * слоя страницы, поиск хватал первую попавшуюся ссылку — однажды так вместо
+ * альбома скачалась книга из бокового списка. Поэтому на каждом уровне
+ * ссылки берём, только пока их мало: много ссылок — значит, мы уже в списке
+ * чужих карточек, и гадать не надо.
+ */
+function targetIds(from) {
+  let node = from;
+
+  for (let depth = 0; node && depth < 12; depth += 1) {
+    const links = node.matches?.('a[href]')
+      ? [node]
+      : [...(node.querySelectorAll?.('a[href*="albumId="],a[href*="/album/"],a[href*="/playlists/"],a[href*="kind="]') || [])];
+
+    if (links.length > 3) break;
+
+    for (const link of links) {
+      const ids = idsFrom(link.getAttribute('href'));
+      if (ids.albumId || ids.owner) return ids;
+    }
+
+    node = node.parentElement;
+  }
+
+  return headerIds(from);
+}
+
+/**
+ * Страница альбома или плейлиста: ссылки на саму себя у неё нет, зато есть
+ * шапка. Номер альбома лежит в адресе обложки (`…/xxxx.a.<номер>-1/…`),
+ * а плейлист выдаёт ссылка на владельца.
+ */
+function headerIds(from) {
+  const head = from?.closest?.('[data-test-id="ENTITY_HEADER"]')
+    || document.querySelector('[data-test-id="ENTITY_HEADER"]');
+
+  if (!head || (from && !head.contains(from))) return {};
+
+  const list = head.querySelector('a[href*="/playlists/"],a[href*="kind="]');
+  if (list) {
+    const ids = idsFrom(list.getAttribute('href'));
+    if (ids.owner) return ids;
+  }
+
+  // Адрес страницы клиента: с 5.120 плейлист открывается по опознавателю
+  // (`/playlists?playlistUuid=…`), пары «владелец и номер» там больше нет.
+  const here = new URLSearchParams(location.search);
+  const uuid = here.get('playlistUuid');
+  if (uuid) return { albumId: null, trackId: null, owner: null, kind: null, uuid };
+
+  const inUrl = idsFrom(location.pathname + location.search);
+  if (inUrl.albumId || inUrl.owner) return inUrl;
+
+  // Первая обложка в шапке — обложка самой сущности; дальше в шапке
+  // попадаются и чужие (у исполнителя альбома она тоже с «.a.»).
+  for (const picture of head.querySelectorAll('img')) {
+    const found = /\.a\.(\d+)-/.exec(picture.getAttribute('src') || '');
+    if (found) return { albumId: found[1], trackId: null, owner: null, kind: null };
+  }
+
+  return {};
+}
+
 /** Номер трека, по которому открыли меню. */
-function currentMenuTrackId() {
-  const ids = targetIds();
+function currentMenuTrackId(from) {
+  const ids = targetIds(from);
   return ids.trackId || currentTrackId();
 }
 
@@ -487,7 +603,7 @@ function watchMenus() {
 
 
   const opener = lastTarget?.closest?.('[data-test-id$="CONTEXT_MENU_BUTTON"]');
-  addMenuItem(menu, menuKind(opener?.getAttribute('data-test-id') || ''));
+  addMenuItem(menu, menuKind(opener?.getAttribute('data-test-id') || ''), opener);
 }
 
 function start() {
