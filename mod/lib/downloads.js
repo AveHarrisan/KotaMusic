@@ -38,36 +38,46 @@ let queue = Promise.resolve();
 
 // Остановка по просьбе человека. Каждая идущая загрузка кладёт сюда свой
 // обрыватель, а ожидающие в очереди сами проверяют признак и не начинают.
-let stopping = false;
-const running = new Set();
+/**
+ * Текущее задание: одна просьба скачать — трек, альбом или плейлист.
+ *
+ * ⚠️Раньше признак остановки был общий на весь мод, и любая новая просьба
+ * скачать его снимала: человек жал «Остановить», а очередь, уже получив
+ * новую задачу, продолжала качать как ни в чём не бывало. Теперь
+ * останавливается именно то задание, которое идёт сейчас.
+ */
+let job = null;
 
-/** Прерывает всё, что качается и ждёт очереди. */
+/** Начало работы: задание создаётся, когда до него дошла очередь. */
+function beginJob() {
+  job = { stopped: false, breakers: new Set() };
+  return job;
+}
+
+/** Прерывает то, что качается прямо сейчас. */
 function stopAll() {
-  if (!running.size && !queue) return false;
+  if (!job || job.stopped) return false;
 
-  stopping = true;
-  for (const breaker of running) {
+  job.stopped = true;
+
+  for (const breaker of job.breakers) {
     try {
       breaker.abort();
     } catch {
-      // уже завершилась — и хорошо
+      // загрузка уже завершилась — и хорошо
     }
   }
 
-  running.clear();
-  log.info('Скачивание остановлено человеком');
+  log.info(`Скачивание остановлено человеком (прервано загрузок: ${job.breakers.size})`);
+  job.breakers.clear();
   return true;
 }
 
-/** Новая просьба скачать: прежний запрет на работу снимаем. */
-function startFresh() {
-  stopping = false;
+/** Ошибка из-за нашей же остановки, а не беда. */
+function isStop(error, mine = job) {
+  return Boolean(mine?.stopped) || error?.name === 'AbortError';
 }
 
-/** Ошибка из-за нашей же остановки, а не беда. */
-function isStop(error) {
-  return stopping || error?.name === 'AbortError';
-}
 
 // Скорость считаем по всем загрузкам разом: показываем одну общую,
 // а не по треку — так понятнее, когда качается альбом в три потока.
@@ -181,12 +191,15 @@ function decryptor(keyHex) {
 /** Скачивает один файл, сообщая долю. */
 async function fetchToFile(url, destination, keyHex, onProgress) {
   const breaker = new AbortController();
-  running.add(breaker);
+  const mine = job;
+
+  if (mine?.stopped) throw new Error('Скачивание остановлено');
+  mine?.breakers.add(breaker);
 
   try {
     await fetchToFileInner(url, destination, keyHex, onProgress, breaker.signal);
   } finally {
-    running.delete(breaker);
+    mine?.breakers.delete(breaker);
   }
 }
 
@@ -351,6 +364,7 @@ function enqueue(task) {
 
 /** Скачивание одного трека по его номеру. */
 async function single(trackId, { dir = null, force = false } = {}) {
+  const mine = job;
   const [track] = await api.tracksMeta([trackId]);
   if (!track) throw new Error('Трек не найден');
 
@@ -375,7 +389,7 @@ async function single(trackId, { dir = null, force = false } = {}) {
     log.info('Скачан трек:', file);
     return { file };
   } catch (e) {
-    if (isStop(e)) {
+    if (isStop(e, mine)) {
       report({ id: 'single', title, done: true, stopped: true });
       return { stopped: true };
     }
@@ -410,6 +424,7 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
     });
   };
 
+  const mine = job;
   const mp3 = settings.get().downloadMp3;
   const errors = [];
   let skipped = 0;
@@ -417,7 +432,7 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
 
   const worker = async () => {
     while (index < tracks.length) {
-      if (stopping) return;
+      if (mine?.stopped) return;
 
       const current = tracks[index];
       index += 1;
@@ -440,7 +455,7 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
           },
         });
       } catch (e) {
-        if (isStop(e)) return;
+        if (isStop(e, mine)) return;
 
         errors.push(`${current.title}: ${e.message}`);
         log.warn('Трек не скачался:', current.title, e.message);
@@ -456,7 +471,7 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
 
   const saved = finished - errors.length - skipped;
 
-  if (stopping) {
+  if (mine?.stopped) {
     report({ id: 'many', title, done: true, stopped: true, folder, saved });
     log.info(`Остановлено: успело скачаться ${saved} из ${total}: ${folder}`);
     return { folder, total, saved, stopped: true, failed: errors.length, skipped };
@@ -536,8 +551,9 @@ function start() {
   }
 
   ipcMain.handle('kotamusic:download:track', async (_event, trackId, options = {}) => {
-    startFresh();
     return enqueue(async () => {
+      beginJob();
+
       try {
         // Первое скачивание: спросим, где держать музыку.
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
@@ -557,8 +573,9 @@ function start() {
   // В «Моей волне» ссылки на трек нет вовсе, поэтому туда приходят
   // название с исполнителем — трек находим сами.
   ipcMain.handle('kotamusic:download:current', async (_event, about) => {
-    startFresh();
     return enqueue(async () => {
+      beginJob();
+
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -578,8 +595,9 @@ function start() {
   });
 
   ipcMain.handle('kotamusic:download:album', async (_event, albumId, options = {}) => {
-    startFresh();
     return enqueue(async () => {
+      beginJob();
+
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 
@@ -595,8 +613,9 @@ function start() {
   });
 
   ipcMain.handle('kotamusic:download:playlist', async (_event, owner, kind, options = {}) => {
-    startFresh();
     return enqueue(async () => {
+      beginJob();
+
       try {
         if (!(await ensureDir())) return { ok: false, error: 'Папка не выбрана' };
 

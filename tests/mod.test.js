@@ -232,3 +232,50 @@ test('скорость скачивания пишется привычными 
   made.addBytes(5 * 1024 * 1024);
   assert.match(made.speedText(), /^\d+([.,]\d)? (Б|КБ|МБ)\/с$/);
 });
+
+test('остановка гасит только своё задание, новая просьба её не снимает', () => {
+  // Собираем ту же связку, что живёт в mod/lib/downloads.js: задание
+  // создаётся, когда до него дошла очередь, и останавливается лично.
+  const source = [
+    extract('mod/lib/downloads.js', 'beginJob'),
+    extract('mod/lib/downloads.js', 'stopAll'),
+    extract('mod/lib/downloads.js', 'isStop'),
+  ].join('\n');
+
+  const make = new Function(
+    `let job = null; const log = { info() {} };
+     ${source};
+     return { beginJob, stopAll, isStop, peek: () => job };`
+  );
+
+  const { beginJob, stopAll, isStop, peek } = make();
+
+  const first = beginJob();
+  assert.strictEqual(first.stopped, false);
+
+  // Человек нажал «Остановить», пока задание идёт.
+  assert.strictEqual(stopAll(), true);
+  assert.strictEqual(first.stopped, true);
+  assert.strictEqual(isStop(null, first), true);
+
+  // Повторное нажатие ничего не ломает и не врёт про успех.
+  assert.strictEqual(stopAll(), false);
+
+  // ⚠️Главное: следующая просьба скачать начинает своё задание, но
+  // остановленное остаётся остановленным — раньше общий признак
+  // снимался, и прерванная очередь продолжала качать.
+  const second = beginJob();
+  assert.strictEqual(second.stopped, false);
+  assert.strictEqual(first.stopped, true);
+  assert.strictEqual(isStop(null, first), true);
+  assert.strictEqual(peek(), second);
+});
+
+test('обрыв загрузки считается остановкой, а не ошибкой', () => {
+  const source = extract('mod/lib/downloads.js', 'isStop');
+  const isStop = new Function(`let job = null;${source};return isStop`)();
+
+  assert.strictEqual(isStop({ name: 'AbortError' }), true);
+  assert.strictEqual(isStop(new Error('сеть отвалилась')), false);
+  assert.strictEqual(isStop(new Error('сеть отвалилась'), { stopped: true }), true);
+});
