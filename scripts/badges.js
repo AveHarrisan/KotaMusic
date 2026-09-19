@@ -33,10 +33,23 @@ const badge = (label, message, color) => ({
   color,
 });
 
+/**
+ * Заголовки для GitHub. ⚠️Без токена API пускает 60 запросов в час на весь
+ * пул раннеров Actions, и сборка по расписанию однажды получила 403.
+ * В прогоне токен есть всегда — берём его.
+ */
+function githubHeaders() {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+
+  return {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'KotaMusic',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 async function releases() {
-  const response = await fetch(API, {
-    headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'KotaMusic' },
-  });
+  const response = await fetch(API, { headers: githubHeaders() });
 
   if (!response.ok) throw new Error(`GitHub ответил ${response.status}`);
   return response.json();
@@ -49,9 +62,7 @@ async function modVersion(list) {
   if (!info) return null;
 
   try {
-    const response = await fetch(info.browser_download_url, {
-      headers: { 'User-Agent': 'KotaMusic' },
-    });
+    const response = await fetch(info.browser_download_url, { headers: githubHeaders() });
 
     if (!response.ok) return null;
     return (await response.json()).modVersion || null;
@@ -125,10 +136,14 @@ async function main() {
     JSON.stringify(state, null, 2) + '\n'
   );
 
-  await fs.writeFile(
-    path.join(OUT, 'mod.json'),
-    JSON.stringify(badge('Версия мода', version || '—', 'blue'), null, 2) + '\n'
-  );
+  // ⚠️Не узнали версию — оставляем прежний значок. Иначе на странице
+  // проекта вместо номера появлялся прочерк из-за одной неудачной попытки.
+  if (version) {
+    await fs.writeFile(
+      path.join(OUT, 'mod.json'),
+      JSON.stringify(badge('Версия мода', version, 'blue'), null, 2) + '\n'
+    );
+  }
 
   console.log('Загрузок:', downloads, `(накоплено ${state.carried}; ${seen.join(', ')})`);
   console.log('Версия мода:', version || 'неизвестна');
@@ -138,7 +153,9 @@ module.exports = { combine, COUNTED };
 
 if (require.main === module) {
   main().catch((e) => {
+    // ⚠️Значки — украшение страницы. Если GitHub не ответил, выпуск от
+    // этого не сломан: раньше такая беда роняла всю сборку и заводила
+    // задачу о поломке врезок, которой не было.
     console.error('Значки не обновились:', e.message);
-    process.exit(1);
   });
 }
