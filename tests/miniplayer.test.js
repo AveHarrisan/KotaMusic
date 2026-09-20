@@ -52,6 +52,12 @@ function harness({ values = {}, displays } = {}) {
       state.created += 1;
     }
     setVisibleOnAllWorkspaces() {}
+    setAlwaysOnTop(value, level) {
+      state.onTop = { value, level };
+    }
+    isAlwaysOnTop() {
+      return Boolean(state.onTop?.value);
+    }
     loadFile() {}
     on(event, fn) {
       state.handlers[event] = fn;
@@ -209,4 +215,24 @@ test('до готовности приложения экраны не трог�
   ready.waiting.forEach((fn) => fn());
 
   assert.ok(state.screenHandlers['display-added'], 'после готовности не подписались');
+});
+
+test('мини-плеер поднимается наверх уровнем, который работает на Windows', () => {
+  const { miniplayer, state } = harness({ values: { miniplayerOnTop: true } });
+
+  miniplayer.start();
+  miniplayer.show();
+
+  // ⚠️Уровень по умолчанию в нынешнем Electron на Windows молча не
+  // применяется, поэтому просим именно «screen-saver».
+  assert.deepStrictEqual(state.onTop, { value: true, level: 'screen-saver' });
+});
+
+test('с выключенной настройкой окно остаётся обычным', () => {
+  const { miniplayer, state } = harness({ values: { miniplayerOnTop: false } });
+
+  miniplayer.start();
+  miniplayer.show();
+
+  assert.strictEqual(state.onTop.value, false);
 });
