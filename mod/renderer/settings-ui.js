@@ -857,6 +857,12 @@ function fill(container) {
         toggle(config.miniplayer, (value) => update({ miniplayer: value }))
       ),
       row(
+        'Поверх других окон',
+        'Выключите — мини-плеер станет обычным окном и будет спокойно лежать ' +
+          'на рабочем столе, не мешая поверх остальных',
+        toggle(config.miniplayerOnTop, (value) => update({ miniplayerOnTop: value }))
+      ),
+      row(
         'Прятать, когда ничего не играет',
         'Окно исчезает вместо надписи «Ничего не играет» и возвращается с первым треком',
         toggle(config.miniplayerHideIdle, (value) => update({ miniplayerHideIdle: value }))

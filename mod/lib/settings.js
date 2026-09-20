@@ -49,6 +49,7 @@ const DEFAULTS = {
 
   // Мини-плеер поверх других окон.
   miniplayer: false,
+  miniplayerOnTop: true,
 
   // Что показывать в мини-плеере.
   miniplayerSeek: true,

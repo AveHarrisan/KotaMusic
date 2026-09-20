@@ -91,7 +91,7 @@ function create() {
     maximizable: false,
     minimizable: false,
     skipTaskbar: !settings.get().miniplayerTaskbar,
-    alwaysOnTop: true,
+    alwaysOnTop: settings.get().miniplayerOnTop !== false,
     backgroundColor: '#1a1a1a',
     title: 'KotaMusic',
     webPreferences: {
@@ -103,6 +103,10 @@ function create() {
   });
 
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  // ⚠️После «показывать на всех рабочих столах» Windows теряет признак
+  // «поверх других», поэтому ставим его заново — уже окончательно.
+  applyOnTop();
 
   // Своё окно масштабу клиента не подчиняется.
   window.webContents.on('did-finish-load', () => window.webContents.setZoomFactor(1));
@@ -238,7 +242,25 @@ function watchDisplays() {
 
 function show() {
   create().show();
+
+  // ⚠️До показа Electron признак «поверх других» не запоминает: окно
+  // создаётся скрытым, и setAlwaysOnTop тогда ничего не делает —
+  // window.isAlwaysOnTop() сразу отвечал false. Ставим после show().
+  applyOnTop();
   push();
+}
+
+/** Держать ли окно поверх остальных — как просили в настройках. */
+function applyOnTop() {
+  if (!alive()) return;
+
+  const onTop = settings.get().miniplayerOnTop !== false;
+
+  // ⚠️Уровень по умолчанию («floating») в этом Electron на Windows не
+  // применяется: setAlwaysOnTop отрабатывает, а isAlwaysOnTop сразу
+  // отвечает false, и окно лежит наравне с остальными. Уровень
+  // «screen-saver» встаёт как надо.
+  window.setAlwaysOnTop(onTop, 'screen-saver');
 }
 
 function hide() {
@@ -346,6 +368,11 @@ function start() {
       // Размер меняем, место сохраняем — окно не должно прыгать.
       const [x, y] = window.getPosition();
       window.setBounds({ x, y, width: currentWidth(), height: currentHeight() });
+    }
+
+    if (now.miniplayerOnTop !== before.miniplayerOnTop && alive()) {
+      // Меняется на лету: окно пересоздавать незачем.
+      applyOnTop();
     }
 
     if (now.miniplayerLocked !== before.miniplayerLocked) {
