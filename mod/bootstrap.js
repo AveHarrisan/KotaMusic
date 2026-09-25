@@ -4,6 +4,15 @@
 const branding = require('./branding');
 const log = require('./lib/log');
 
+// ⚠️Node даёт соединению по каждому адресу всего 250 мс, а потом берёт
+// следующий, и с последним сдаётся с «fetch failed». Если адресов несколько,
+// а связь медленная, не успевает ни один. Так было 25.09.2026: в hosts
+// у человека вписаны адреса GitHub, IPv4 с соединением за ~300 мс и
+// нерабочий IPv6, и обновления мода не скачивались. Даём 3 секунды.
+try {
+  require('net').setDefaultAutoSelectFamilyAttemptTimeout(3000);
+} catch {}
+
 try {
   const { app } = require('electron');
 

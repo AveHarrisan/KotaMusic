@@ -419,6 +419,13 @@ function start() {
     shell.openExternal(url);
   });
 
+  /** «fetch failed» человеку ничего не говорит — объясняем, что с сетью. */
+  const humanError = (e) =>
+    e.message === 'fetch failed'
+      ? 'нет связи с GitHub' + (e.cause?.code ? ` (${e.cause.code})` : '') +
+        '. Проверьте интернет, VPN или прокси и попробуйте ещё раз'
+      : e.message;
+
   // Кнопка «Обновить» в сообщении: качаем архив, подменяем его и
   // перезапускаем клиент — установщик для этого не нужен.
   ipcMain.on('kotamusic:update:apply', async (event, update) => {
@@ -429,8 +436,8 @@ function start() {
         event.sender.send('kotamusic:update:progress', Math.round(share * 100))
       );
     } catch (e) {
-      log.warn('Обновление не удалось:', e.message);
-      event.sender.send('kotamusic:update:failed', e.message);
+      log.warn('Обновление не удалось:', e.message, e.cause?.code || '');
+      event.sender.send('kotamusic:update:failed', humanError(e));
     }
   });
 
