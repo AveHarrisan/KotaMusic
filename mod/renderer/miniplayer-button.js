@@ -371,7 +371,11 @@ function buildUpdater() {
 
     // Если обновление есть, главный процесс сам покажет окно обновления.
     if (result?.found) return;
-    showToast(result?.error ? 'Не удалось проверить обновления. Попробуйте позже.' : 'Обновлений нет — у вас последняя версия.');
+    showToast(
+      result?.error
+        ? `Не удалось проверить обновления: ${result.reason || 'попробуйте позже'}. Отчёт для задачи — в настройках мода, в самом низу.`
+        : 'Обновлений нет — у вас последняя версия.'
+    );
   });
 
   document.body.appendChild(updater);
@@ -605,6 +609,7 @@ function showToast(message) {
   toast.innerHTML = '<b style="display:block;margin-bottom:4px">KotaMusic</b>';
   toast.appendChild(document.createTextNode(message));
   document.body.appendChild(toast);
+  window.__kotamusicPopup?.(toast);
   requestAnimationFrame(() => (toast.style.opacity = '1'));
 
   const hide = () => {
@@ -631,6 +636,7 @@ function showHint() {
     'маленькое окно поверх остальных. Оно запоминает, куда вы его поставили.';
 
   document.body.appendChild(hint);
+  window.__kotamusicPopup?.(hint);
   requestAnimationFrame(() => (hint.style.opacity = '1'));
 
   const hide = () => {

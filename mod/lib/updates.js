@@ -26,6 +26,7 @@ const branding = require('../branding');
 const settings = require('./settings');
 const upstream = require('./upstream');
 const log = require('./log');
+const diagnostics = require('./diagnostics');
 
 const API = `https://api.github.com/repos/${branding.repositoryUrl.split('github.com/')[1]}/releases`;
 
@@ -51,11 +52,9 @@ function newer(a, b) {
 
 /** Самый свежий релиз мода: тег и версия клиента, под которую он собран. */
 async function latest() {
-  const response = await fetch(API, {
+  const response = await diagnostics.request(API, {
     headers: { Accept: 'application/vnd.github+json', 'User-Agent': branding.name },
   });
-
-  if (!response.ok) throw new Error(`GitHub ответил ${response.status}`);
 
   const releases = (await response.json()).filter((r) => !r.draft && !r.prerelease);
   const mod = releases.find((r) => /^mod-/.test(r.tag_name));
@@ -74,9 +73,11 @@ async function latest() {
 
   if (info) {
     try {
-      const response = await fetch(info.browser_download_url, {
-        headers: { 'User-Agent': branding.name },
-      });
+      const response = await diagnostics.request(
+        info.browser_download_url,
+        { headers: { 'User-Agent': branding.name } },
+        { allowStatus: true }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -84,7 +85,7 @@ async function latest() {
         if (Array.isArray(data.notes)) notes = data.notes;
       }
     } catch (e) {
-      log.debug('Версию мода из релиза прочитать не вышло:', e.message);
+      log.debug('Версию мода из релиза прочитать не вышло:', diagnostics.remember(e, 'Проверка версии мода'));
     }
   }
 
@@ -123,8 +124,9 @@ async function downloadAsar(update, onProgress) {
     return file;
   }
 
-  const response = await fetch(update.asset, { headers: { 'User-Agent': branding.name } });
-  if (!response.ok) throw new Error(`Скачивание не удалось: ${response.status}`);
+  const response = await diagnostics.request(update.asset, {
+    headers: { 'User-Agent': branding.name },
+  });
 
   const total = Number(response.headers.get('content-length')) || update.size;
   const chunks = [];
@@ -370,7 +372,7 @@ async function check() {
     if (update?.kind === 'waiting') return log.info(`Вышел клиент ${update.target}, жду сборку мода под него`);
     if (update) notify(update);
   } catch (e) {
-    log.debug('Проверка обновлений не удалась:', e.message);
+    log.debug('Проверка обновлений не удалась:', diagnostics.remember(e, 'Проверка обновлений'));
   }
 }
 
@@ -384,8 +386,9 @@ async function checkNow() {
     notify(update, true);
     return { found: true };
   } catch (e) {
-    log.warn('Проверка обновлений по кнопке не удалась:', e.message);
-    return { found: false, error: true };
+    const reason = diagnostics.remember(e, 'Проверка обновлений по кнопке');
+    log.warn('Проверка обновлений по кнопке не удалась:', reason);
+    return { found: false, error: true, reason };
   }
 }
 
@@ -419,13 +422,6 @@ function start() {
     shell.openExternal(url);
   });
 
-  /** «fetch failed» человеку ничего не говорит — объясняем, что с сетью. */
-  const humanError = (e) =>
-    e.message === 'fetch failed'
-      ? 'нет связи с GitHub' + (e.cause?.code ? ` (${e.cause.code})` : '') +
-        '. Проверьте интернет, VPN или прокси и попробуйте ещё раз'
-      : e.message;
-
   // Кнопка «Обновить» в сообщении: качаем архив, подменяем его и
   // перезапускаем клиент — установщик для этого не нужен.
   ipcMain.on('kotamusic:update:apply', async (event, update) => {
@@ -436,8 +432,9 @@ function start() {
         event.sender.send('kotamusic:update:progress', Math.round(share * 100))
       );
     } catch (e) {
-      log.warn('Обновление не удалось:', e.message, e.cause?.code || '');
-      event.sender.send('kotamusic:update:failed', humanError(e));
+      const reason = diagnostics.remember(e, `Обновление до ${update?.tag}`);
+      log.warn('Обновление не удалось:', reason, '|', e.message, e.cause?.code || '');
+      event.sender.send('kotamusic:update:failed', reason);
     }
   });
 

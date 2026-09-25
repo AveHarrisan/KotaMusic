@@ -112,9 +112,44 @@ ipcRenderer.on('kotamusic:update:available', (_event, update) => {
     ipcRenderer.on('kotamusic:update:failed', (_e, message) => {
       now.disabled = false;
       now.textContent = 'Обновить и перезапустить';
-      text.textContent = `Не вышло: ${message}`;
+      text.textContent = `Не вышло: ${message}.`;
+      offerReport();
     });
   }
+
+  // Обновление сорвалось — даём собрать отчёт и сразу завести задачу:
+  // по одной строке ошибки причину не найти.
+  let report = null;
+  const offerReport = () => {
+    if (report) return;
+
+    report = button('Собрать логи');
+    report.addEventListener('click', async (event) => {
+      event.stopPropagation();
+
+      if (report.dataset.issue) {
+        ipcRenderer.send('kotamusic:open-url', report.dataset.issue);
+        return;
+      }
+
+      report.disabled = true;
+      report.textContent = 'Собираю… (до 20 с)';
+
+      const result = await ipcRenderer.invoke('kotamusic:diagnostics:collect').catch(() => null);
+      report.disabled = false;
+
+      if (!result || result.error) {
+        report.textContent = 'Собрать логи';
+        text.textContent = `Отчёт не собрался: ${result?.error || 'неизвестная ошибка'}`;
+        return;
+      }
+
+      report.dataset.issue = result.issueUrl;
+      report.textContent = 'Создать задачу на GitHub';
+      text.textContent =
+        'Отчёт сохранён в «Загрузки», папка открыта. Создайте задачу и перетащите в неё этот файл.';
+    });
+  };
 
   const open = button('Страница релиза');
 
@@ -126,6 +161,7 @@ ipcRenderer.on('kotamusic:update:available', (_event, update) => {
 
   box.appendChild(row);
   document.body.appendChild(box);
+  window.__kotamusicPopup?.(box);
   requestAnimationFrame(() => (box.style.opacity = '1'));
 
   box.addEventListener('click', hide);

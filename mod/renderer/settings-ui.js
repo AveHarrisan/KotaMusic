@@ -1239,6 +1239,41 @@ function fill(container) {
           update({ holdClientUpdates: value })
         )
       ),
+    ])
+  );
+
+  // Последним разделом: сюда приходят, когда что-то сломалось.
+  add(
+    section('Журналы и помощь', [
+      row(
+        'Собрать логи',
+        'Версии, проверка связи с GitHub и Яндексом, последние ошибки — в один файл в «Загрузках». Приложите его к задаче на GitHub',
+        actionButton('Собрать', async (event) => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          button.textContent = 'Собираю…';
+          say(button, 'Проверяю связь, это до 20 секунд');
+
+          const result = await ipcRenderer.invoke('kotamusic:diagnostics:collect').catch(() => null);
+
+          button.disabled = false;
+          button.textContent = 'Собрать';
+          say(
+            button,
+            !result || result.error
+              ? `Отчёт не собрался: ${result?.error || 'неизвестная ошибка'}`
+              : 'Готово: файл в «Загрузках», папка открыта'
+          );
+        })
+      ),
+      row(
+        'Сообщить о проблеме',
+        'Откроет новую задачу на GitHub с уже вписанными версиями',
+        actionButton('Открыть', async () => {
+          const url = await ipcRenderer.invoke('kotamusic:diagnostics:issue-url');
+          ipcRenderer.send('kotamusic:open-url', url);
+        })
+      ),
       row(
         'Подробный журнал',
         'Записывать в файл, что уходит в Discord',

@@ -56,6 +56,7 @@ try {
     'window',
     'restart',
     'updates',
+    'diagnostics',
     'downloads',
     'storage',
     'lyrics',

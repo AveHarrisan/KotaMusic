@@ -11,6 +11,8 @@ const path = require('path');
 // файл, поэтому хватает и штатного модуля.
 const fs = require('fs');
 
+const diagnostics = require('./diagnostics');
+
 const META_BASE = 'https://music-desktop-application.s3.yandex.net/stable/';
 const CDN_BASE = 'https://desktop.app.music.yandex.net/stable/';
 
@@ -28,8 +30,7 @@ async function latest() {
   const source = SOURCE[process.platform];
   if (!source) throw new Error('Для этой системы установщика нет');
 
-  const response = await fetch(META_BASE + source.meta);
-  if (!response.ok) throw new Error(`${source.meta}: HTTP ${response.status}`);
+  const response = await diagnostics.request(META_BASE + source.meta);
 
   const text = await response.text();
   const version = /^version:\s*(.+)$/m.exec(text)?.[1]?.trim();
@@ -50,9 +51,7 @@ async function download(url, onProgress) {
   fs.mkdirSync(dir, { recursive: true });
 
   const file = path.join(dir, path.basename(new URL(url).pathname));
-  const response = await fetch(url);
-
-  if (!response.ok) throw new Error(`Скачивание не удалось: ${response.status}`);
+  const response = await diagnostics.request(url);
 
   const total = Number(response.headers.get('content-length')) || 0;
   const chunks = [];

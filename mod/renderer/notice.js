@@ -60,6 +60,7 @@ ipcRenderer.on('kotamusic:notice', (_event, notice) => {
     hide();
   });
   document.body.appendChild(box);
+  window.__kotamusicPopup?.(box);
   requestAnimationFrame(() => (box.style.opacity = '1'));
 
   // Подтверждаем показ: иначе непонятно, дошло ли сообщение до глаз.
