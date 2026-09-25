@@ -18,8 +18,13 @@ const NAME = 'WebNextYnisonActivityInterception';
 // Клиент спрашивает эксперименты двумя способами, и оба надо накрыть:
 // getExperiment отдаёт описание опыта, checkExperiment сверяет его группу
 // с ожидаемой. Ynison ходит именно через второй.
+//
+// ⚠️За тело checkExperiment не цепляемся: в 5.121 Яндекс его переписал
+// (было `let r=e.experiments[t]`, стало `let i=e.experiments,{…}`), и
+// врезка молча перестала ложиться. Заголовок метода вида `(a,b){` бывает
+// только у определения — вызовы идут со строкой вторым аргументом.
 const ANCHOR = /getExperiment\((\w+)\)\{var (\w+);/;
-const CHECK = /checkExperiment\((\w+),(\w+)\)\{let (\w+)=(\w+)\.experiments\[\1\]/;
+const CHECK = /checkExperiment\((\w+),(\w+)\)\{/;
 
 module.exports = {
   id: 'ynison-remote',
@@ -64,9 +69,7 @@ module.exports = {
     // Ynison он ждёт «on».
     patched = patched.replace(
       new RegExp(CHECK, 'g'),
-      'checkExperiment($1,$2){' +
-        `if(${on})return $2==="on";` +
-        'let $3=$4.experiments[$1]'
+      'checkExperiment($1,$2){' + `if(${on})return $2==="on";`
     );
 
     return patched === code ? null : patched;

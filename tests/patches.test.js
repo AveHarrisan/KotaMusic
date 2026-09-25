@@ -31,7 +31,8 @@ function clientRoot() {
         fs.existsSync(path.join(dir, 'index.js')) &&
         fs.existsSync(path.join(dir, 'app', '_next', 'static', 'chunks'))
     )
-    .sort();
+    // По номерам, а не строкой: иначе 5.85 «новее» 5.121.
+    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
   return full.length ? full[full.length - 1] : null;
 }
