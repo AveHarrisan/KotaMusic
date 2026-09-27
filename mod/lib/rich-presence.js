@@ -22,6 +22,7 @@ const SEEK_TOLERANCE_S = 3; // расхождение, после которог
 const CLEAR_GRACE_MS = 6000; // на стыке треков плеер на миг «не играет»
 const PAUSE_CONFIRM_MS = 2500; // на стыке треков плеер на миг «на паузе»
 const STALL_MS = 15000; // столько время трека стоит на месте — значит, пауза
+const SIMPLIFY_RETRY_MS = 10 * 60 * 1000; // через столько снова пробуем полный вид
 const WEB_BASE = 'https://music.yandex.ru';
 
 let rpc = null;
@@ -43,8 +44,21 @@ let track = null;
 let panelTrack = null; // как состояние видит панель, без поправки на паузу
 let lastSent = '';
 // Часть полей поддерживают не все версии Discord: если он ругается,
-// переходим на упрощённый вид и больше не пробуем.
-let simplify = false;
+// переходим на упрощённый вид. Но ругается он и на разовые сбои
+// («Unknown Error» при сетевой заминке) — навсегда упрощать нельзя:
+// пропадали название трека в списке участников и кнопки до перезапуска
+// клиента. Поэтому упрощаем на время и сбрасываем при переподключении
+// и смене настроек.
+let simplifiedAt = null;
+
+function simplified() {
+  if (simplifiedAt === null) return false;
+  if (Date.now() - simplifiedAt < SIMPLIFY_RETRY_MS) return true;
+
+  simplifiedAt = null;
+  log.info('Снова пробую полный вид статуса');
+  return false;
+}
 
 /** Активность без необязательных полей. */
 function basic(activity) {
@@ -235,7 +249,7 @@ function sync() {
   lastSent = snapshot;
   lastSentAt = Date.now();
 
-  const payload = simplify ? basic(activity) : activity;
+  const payload = simplified() ? basic(activity) : activity;
   log.debug('Отправлено в Discord:', JSON.stringify(payload));
 
   // Discord мог закрыться или перезапуститься — тогда отправка не удастся
@@ -304,8 +318,8 @@ async function connect() {
     if (payload.evt !== 'ERROR') return;
 
     log.warn('Discord отклонил статус:', JSON.stringify(payload.data));
-    if (!simplify) {
-      simplify = true;
+    if (!simplified()) {
+      simplifiedAt = Date.now();
       lastSent = '';
       log.info('Повторяю в упрощённом виде');
       sync();
@@ -315,6 +329,7 @@ async function connect() {
   try {
     await client.connect();
     log.info(`Discord подключён; приложение ${clientId}`);
+    simplifiedAt = null;
     lastSent = '';
     sync();
   } catch (e) {
@@ -514,6 +529,7 @@ function start() {
     }
 
     lastSent = ''; // содержимое статуса могло измениться при тех же данных
+    simplifiedAt = null; // переключение настройки — повод снова попробовать полный вид
     watchPause();
     scheduleSync();
   });
