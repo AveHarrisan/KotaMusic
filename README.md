@@ -59,6 +59,13 @@ Discord Rich Presence, мини-плеер, горячие клавиши и д�
 <sub>канал про игры<br>и раздачи</sub>
 </td>
 <td align="center" width="120">
+<a href="https://play.google.com/store/apps/details?id=app.parokot.ru">
+<img src="docs/images/links/parokot.png" width="72" height="72" alt="ПароКот"><br>
+<b>ПароКот</b>
+</a><br>
+<sub>релизы и цены<br>на игры</sub>
+</td>
+<td align="center" width="120">
 <a href="https://discord.com/invite/XYBvdvfv8t">
 <img src="docs/images/links/discord.png" width="72" height="72" alt="Discord"><br>
 <b>Discord</b>
@@ -460,6 +467,7 @@ docs/       план работ и картинки
 
 - **[lvl.su](https://lvl.su/)** — сайт: гайды и вики по играм
 - **[Котамарин](https://t.me/kotamarine)** — телеграм-канал про игры
+- **[ПароКот](https://play.google.com/store/apps/details?id=app.parokot.ru)** — приложение для Android: релизы игр и слежение за ценами
 - **[AveHarrisan](https://t.me/aveharrisan)** — личный телеграм
 
 Те же ссылки есть внутри мода — в настройках, раздел «Ссылки», — и в окне
