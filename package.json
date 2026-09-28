@@ -1,6 +1,7 @@
 {
   "name": "kotamusic",
   "version": "1.2.21",
+  "license": "GPL-3.0-only",
   "description": "",
   "main": "index.js",
   "scripts": {
