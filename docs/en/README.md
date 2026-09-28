@@ -267,3 +267,12 @@ builds for current client versions.
 
 - **[Boosty](https://boosty.to/aveharrisan)**
 - **[DonationAlerts](https://www.donationalerts.com/r/aveharrisan)**
+
+## License
+
+© 2026 AveHarrisan. Licensed under the [GNU GPL v3.0](../../LICENSE) with an
+additional attribution term (section 7(b), see the end of the LICENSE file):
+any fork, modified version or code taken from KotaMusic, even in part, must
+credit the original author — "Based on KotaMusic by AveHarrisan" with a link to
+this repository — in its README and, if it has one, in its "About" or settings
+section. Author attributions in the code and interface must not be removed.

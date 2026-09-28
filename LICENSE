@@ -672,3 +672,49 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+                     ADDITIONAL TERMS UNDER SECTION 7(b)
+                  ДОПОЛНИТЕЛЬНЫЕ УСЛОВИЯ ПО ПУНКТУ 7(b)
+
+ KotaMusic
+ Copyright (C) 2026  AveHarrisan <https://github.com/AveHarrisan>
+
+  As permitted by section 7(b) of the GNU General Public License version 3,
+the following additional terms apply to this program:
+
+  1. Any copy, modified version, fork or other work based on this program
+     (in whole or in part), in source or object form, must preserve this
+     copyright notice and clearly credit the original author:
+
+         Based on KotaMusic by AveHarrisan
+         https://github.com/AveHarrisan/KotaMusic
+
+  2. This credit must appear in the README (or equivalent documentation)
+     of the work and, if the work has a user interface with an "About",
+     settings or similar informational section, in that section as well.
+
+  3. You may not remove or alter author attributions and copyright notices
+     contained in the source files, documentation or user interface of
+     this program, and you may not present the program or a modified
+     version of it as your own original work.
+
+  На основании пункта 7(b) GNU GPL v3 к программе применяются
+дополнительные условия:
+
+  1. Любая копия, изменённая версия, форк или иная работа, основанная на
+     этой программе целиком или частично, в исходном или собранном виде,
+     обязана сохранять это уведомление об авторских правах и явно
+     указывать автора оригинала:
+
+         Основано на KotaMusic, автор — AveHarrisan
+         https://github.com/AveHarrisan/KotaMusic
+
+  2. Указание авторства должно быть в README (или аналогичной
+     документации) работы, а если у работы есть интерфейс с разделом
+     «О программе», настройками или подобным информационным разделом —
+     также и в нём.
+
+  3. Запрещается удалять или изменять указания авторства и уведомления об
+     авторских правах, содержащиеся в исходном коде, документации или
+     интерфейсе программы, а также выдавать программу или её изменённую
+     версию за собственную оригинальную работу.
