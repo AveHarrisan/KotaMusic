@@ -324,3 +324,19 @@ test('остановка снимает и то, что ждёт своей оч
   assert.strictEqual(later.ok, true);
   assert.deepStrictEqual(done, ['первая', 'после']);
 });
+
+test('ярлык страницы клиента переводится в ссылку yandexmusic://', () => {
+  const source = extract('mod/lib/deeplinks.js', 'toClientLink');
+  const toClientLink = new Function(
+    `const INTERNAL_PREFIX = /^music-application:\\/\\/desktop\\/+/i;${source};return toClientLink`
+  )();
+
+  // Такой адрес Windows кладёт в ярлык, если перетащить исполнителя из окна.
+  assert.strictEqual(
+    toClientLink('music-application://desktop/artist?artistId=22710478'),
+    'yandexmusic://artist?artistId=22710478'
+  );
+  assert.strictEqual(toClientLink('yandexmusic://album/1'), null);
+  assert.strictEqual(toClientLink('--flag'), null);
+  assert.strictEqual(toClientLink(undefined), null);
+});

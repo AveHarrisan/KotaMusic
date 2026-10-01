@@ -1216,6 +1216,11 @@ function fill(container) {
         toggle(config.liteVibeAnimation, (value) => update({ liteVibeAnimation: value }))
       ),
       row(
+        'Не выносить ссылки из окна',
+        'Перетаскивание трека или исполнителя наружу не создаёт ярлык на рабочем столе',
+        toggle(config.blockDragOut !== false, (value) => update({ blockDragOut: value }))
+      ),
+      row(
         'Не гасить экран во время музыки',
         'Пока идёт воспроизведение',
         toggle(config.preventSleep, (value) => update({ preventSleep: value }))

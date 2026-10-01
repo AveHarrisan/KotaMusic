@@ -60,6 +60,7 @@ try {
     'downloads',
     'storage',
     'lyrics',
+    'deeplinks',
   ]) {
     startPart(name);
   }
