@@ -22,6 +22,25 @@ const OUT = path.join(ROOT, 'dist');
 
 const INSTALLER_KEY = { linux: 'linux', win32: 'windows', darwin: 'macos' };
 
+/** Качает установщик в stage (если ещё нет) и достаёт из него app.asar. */
+async function fetchAsar(url, platform, stage) {
+  const installer = path.join(stage, path.basename(new URL(url).pathname));
+
+  if (!fs.existsSync(installer)) {
+    console.log('Скачиваю установщик…');
+    await upstream.download(url, installer);
+  } else {
+    console.log('Установщик уже скачан, использую его');
+  }
+
+  const asarPath = path.join(stage, 'app.asar');
+  if (!fs.existsSync(asarPath)) {
+    console.log('Достаю app.asar…');
+    await upstream.extractAsar(installer, platform, stage);
+  }
+  return asarPath;
+}
+
 async function main() {
   const args = Object.fromEntries(
     process.argv.slice(2).map((a) => a.replace(/^--/, '').split('='))
@@ -50,19 +69,15 @@ async function main() {
     if (!downloads[key]) throw new Error(`Установщика ${version} для ${key} на раздаче пока нет`);
 
     stage = path.join(WORK, `${version}-${platform}`);
-    const installer = path.join(stage, path.basename(new URL(downloads[key]).pathname));
-
-    if (!fs.existsSync(installer)) {
-      console.log('Скачиваю установщик…');
-      await upstream.download(downloads[key], installer);
-    } else {
-      console.log('Установщик уже скачан, использую его');
-    }
-
-    asarPath = path.join(stage, 'app.asar');
-    if (!fs.existsSync(asarPath)) {
-      console.log('Достаю app.asar…');
-      await upstream.extractAsar(installer, platform, stage);
+    try {
+      asarPath = await fetchAsar(downloads[key], platform, stage);
+    } catch (err) {
+      // app.asar одинаков на всех системах, поэтому битый установщик
+      // одной системы не повод пропускать версию: берём из Windows.
+      if (err.code !== 'BROKEN_INSTALLER' || platform === 'win32' || !downloads.windows) throw err;
+      console.log(`${err.message} — беру app.asar из установщика Windows`);
+      stage = path.join(WORK, `${version}-${platform}-from-win32`);
+      asarPath = await fetchAsar(downloads.windows, 'win32', stage);
     }
   }
 

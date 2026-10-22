@@ -65,6 +65,14 @@ async function extractAsar(installerPath, platform, outDir) {
   if (platform === 'linux') {
     execFileSync('ar', ['x', installerPath], { cwd: outDir });
     const data = fs.readdirSync(outDir).find((f) => f.startsWith('data.tar'));
+    // ⚠️ 22.10.2026 Яндекс выложил .deb 5.124.1 размером 96 байт — пустой
+    // архив без data.tar. Раньше это падало невнятным «tar: undefined».
+    if (!data) {
+      const size = fs.statSync(installerPath).size;
+      const err = new Error(`Битый установщик от Яндекса: в .deb нет data.tar (${size} байт)`);
+      err.code = 'BROKEN_INSTALLER';
+      throw err;
+    }
     execFileSync('tar', ['xf', data, '--wildcards', '*/resources/app.asar'], { cwd: outDir });
     const found = findFile(outDir, 'app.asar');
     if (!found) throw new Error('app.asar не найден в .deb');
