@@ -29,16 +29,53 @@ function parseMeta(text, pattern) {
   return { version, url: file ? new URL(file, base.endsWith('/') ? base : base + '/').href : null };
 }
 
+// ⚠️ 28.10.2026 автосборка упала на первом же запросе к раздаче: машины
+// GitHub в США иногда не достукиваются до серверов Яндекса. Код и клиент
+// при этом не менялись, а открылась задача «врезки не легли». Поэтому
+// каждый запрос — с ограничением времени и несколькими повторами.
+const ATTEMPTS = 5;
+const PAUSES_MS = [10_000, 30_000, 60_000, 120_000];
+
+/** Ошибка сети: по ней прогон не считается поломкой мода. */
+class NetworkError extends Error {
+  constructor(message) {
+    super(message);
+    this.code = 'NETWORK';
+  }
+}
+
+/** fetch с повторами; tries и pause подменяются в проверках. */
+async function fetchRetry(url, { timeoutMs = 60_000, read, tries = ATTEMPTS, pause = PAUSES_MS } = {}) {
+  let last;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      // 404 повторять бесполезно — такого файла нет.
+      if (res.status === 404) throw Object.assign(new Error(`${url}: HTTP 404`), { final: true });
+      if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+      return await read(res);
+    } catch (err) {
+      if (err.final) throw err;
+      last = err;
+      const why = err.cause?.code || err.message;
+      if (attempt < tries) {
+        const wait = pause[Math.min(attempt - 1, pause.length - 1)];
+        console.log(`Сеть: ${why} — попытка ${attempt} из ${tries}, повтор через ${wait / 1000} с`);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  throw new NetworkError(`Сбой сети до раздачи Яндекса: ${url} — ${last.cause?.code || last.message}`);
+}
+
 /** Текущая версия клиента и адреса установщиков именно этой версии. */
 async function getLatest() {
   const downloads = {};
   let version = null;
 
   for (const [key, source] of Object.entries(SOURCES)) {
-    const res = await fetch(META_BASE + source.meta);
-    if (!res.ok) throw new Error(`${source.meta}: HTTP ${res.status}`);
-
-    const meta = parseMeta(await res.text(), source.file);
+    const text = await fetchRetry(META_BASE + source.meta, { read: (res) => res.text() });
+    const meta = parseMeta(text, source.file);
     if (key === 'windows') version = meta.version;
     // Раздача под разные системы может обновляться не одновременно —
     // ссылку на чужую версию не отдаём вовсе.
@@ -50,10 +87,20 @@ async function getLatest() {
 }
 
 async function download(url, dest) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Скачивание ${url}: HTTP ${res.status}`);
+  const data = await fetchRetry(url, {
+    timeoutMs: 10 * 60_000,
+    read: async (res) => {
+      const buf = Buffer.from(await res.arrayBuffer());
+      // Оборванная закачка — тоже повод повторить, а не собирать из обрубка.
+      const expected = Number(res.headers.get('content-length'));
+      if (expected && buf.length !== expected) {
+        throw new Error(`скачано ${buf.length} из ${expected} байт`);
+      }
+      return buf;
+    },
+  });
   await fsp.mkdir(path.dirname(dest), { recursive: true });
-  await fsp.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+  await fsp.writeFile(dest, data);
   return dest;
 }
 
@@ -128,4 +175,4 @@ function findFile(dir, name) {
 }
 
 module.exports = {
-  parseMeta, getLatest, download, extractAsar, META_BASE, CDN_BASE };
+  parseMeta, getLatest, download, extractAsar, fetchRetry, NetworkError, META_BASE, CDN_BASE };
