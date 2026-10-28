@@ -66,18 +66,29 @@ async function main() {
     version = latest;
     console.log(`Клиент Яндекс Музыки: ${version} (${platform})`);
 
-    if (!downloads[key]) throw new Error(`Установщика ${version} для ${key} на раздаче пока нет`);
-
-    stage = path.join(WORK, `${version}-${platform}`);
-    try {
-      asarPath = await fetchAsar(downloads[key], platform, stage);
-    } catch (err) {
-      // app.asar одинаков на всех системах, поэтому битый установщик
-      // одной системы не повод пропускать версию: берём из Windows.
-      if (err.code !== 'BROKEN_INSTALLER' || platform === 'win32' || !downloads.windows) throw err;
-      console.log(`${err.message} — беру app.asar из установщика Windows`);
+    // app.asar одинаков на всех системах, поэтому битый или отсутствующий
+    // установщик одной системы не повод пропускать версию: берём из Windows.
+    const fromWindows = async (why) => {
+      if (platform === 'win32' || !downloads.windows) return false;
+      console.log(`${why} — беру app.asar из установщика Windows`);
       stage = path.join(WORK, `${version}-${platform}-from-win32`);
       asarPath = await fetchAsar(downloads.windows, 'win32', stage);
+      return true;
+    };
+
+    // ⚠️ 28.10.2026 Яндекс выложил Linux 5.124.2, пока Windows ещё 5.124.1:
+    // .deb версии 5.124.1 с раздачи пропал, и автосборка падала каждый час.
+    if (!downloads[key]) {
+      if (!(await fromWindows(`Установщика ${version} для ${key} на раздаче нет`))) {
+        throw new Error(`Установщика ${version} для ${key} на раздаче пока нет`);
+      }
+    } else {
+      stage = path.join(WORK, `${version}-${platform}`);
+      try {
+        asarPath = await fetchAsar(downloads[key], platform, stage);
+      } catch (err) {
+        if (err.code !== 'BROKEN_INSTALLER' || !(await fromWindows(err.message))) throw err;
+      }
     }
   }
 
