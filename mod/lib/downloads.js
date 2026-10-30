@@ -134,8 +134,8 @@ function speedText() {
 const quality = new Map();
 
 /**
- * Расширение по кодеку. FLAC Яндекс отдаёт внутри контейнера MP4 — мы
- * его оттуда достаём, поэтому файл получается настоящим .flac.
+ * Расширение по кодеку. Лучшее качество Яндекс отдаёт внутри контейнера
+ * MP4 — мы звук оттуда достаём, поэтому файл получается в родном формате.
  */
 function extensionFor(codec) {
   const plain = String(codec || '').replace(/-mp4$/, '');
@@ -339,8 +339,8 @@ async function ensureDir() {
 }
 
 /** Скачивает трек и возвращает путь к файлу. */
-async function downloadTrack(track, { dir, mp3, onProgress } = {}) {
-  const info = await api.fileInfo(track.id, { mp3 });
+async function downloadTrack(track, { dir, format, onProgress } = {}) {
+  const info = await api.fileInfo(track.id, { format });
   if (!info?.url) throw new Error('Яндекс не дал ссылку на файл');
 
   log.debug('Файл трека:', JSON.stringify({ codec: info.codec, bitrate: info.bitrate, transport: info.transport, container: info.container }));
@@ -432,7 +432,7 @@ async function single(trackId, { dir = null, force = false } = {}) {
   try {
     const file = await downloadTrack(track, {
       dir,
-      mp3: settings.get().downloadMp3,
+      format: settings.get().downloadFormat,
       onProgress: (share) => report({ id: 'single', title, share }),
     });
 
@@ -476,7 +476,7 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
   };
 
   const mine = job;
-  const mp3 = settings.get().downloadMp3;
+  const format = settings.get().downloadFormat;
   const errors = [];
   let skipped = 0;
   let index = 0;
@@ -499,7 +499,7 @@ async function many(tracks, title, { ownFolder = null, force = false } = {}) {
       try {
         await downloadTrack(current, {
           dir: folder,
-          mp3,
+          format,
           onProgress: (share) => {
             shares.set(current.id, share);
             tell();
@@ -696,8 +696,10 @@ function start() {
       if (!trackId) return null;
 
       const info = await api.fileInfo(trackId, { quality: wanted });
-      const codec = api.CODEC_LABEL[info?.codec] || String(info?.codec || '').toUpperCase();
-      const mark = api.QUALITY_LABEL[info?.quality] || (codec === 'FLAC' ? 'HQ+' : '');
+      // У лучшего качества пишем только «HQ+», без названия кодека.
+      const best = String(info?.codec || '').startsWith('flac');
+      const codec = best ? '' : api.CODEC_LABEL[info?.codec] || String(info?.codec || '').toUpperCase();
+      const mark = api.QUALITY_LABEL[info?.quality] || (best ? 'HQ+' : '');
       const bitrate = Number(info?.bitrate) || 0;
 
       const answer = {

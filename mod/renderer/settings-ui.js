@@ -714,7 +714,7 @@ function fill(container) {
       ),
       row(
         'Качество трека в панели',
-        'Подпись рядом с кнопкой качества: «HQ+: FLAC»',
+        'Подпись рядом с кнопкой качества: «HQ+»',
         toggle(config.showTrackQuality, (value) => update({ showTrackQuality: value }))
       ),
       row(
@@ -752,9 +752,14 @@ function fill(container) {
         { stacked: true }
       ),
       row(
-        'Скачивать в MP3',
-        'Иначе — в том формате, который отдаёт Яндекс',
-        toggle(config.downloadMp3, (value) => update({ downloadMp3: value }))
+        'Формат файла',
+        'Лучшее — самое высокое качество, какое есть у трека; MP3 и M4A — меньше по размеру',
+        choice(
+          [['best', 'Лучшее'], ['m4a', 'M4A'], ['mp3', 'MP3']],
+          config.downloadFormat || 'best',
+          (value) => update({ downloadFormat: value })
+        ),
+        { stacked: true }
       ),
       row(
         'Обложка и подписи в файле',

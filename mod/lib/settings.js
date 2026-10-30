@@ -25,7 +25,9 @@ const DEFAULTS = {
 
   // Скачивание треков в обычные файлы.
   downloadDir: '',
-  downloadMp3: false,
+  // Формат файла: 'best' — лучшее доступное качество, 'm4a' — AAC,
+  // 'mp3' — готовый MP3 от Яндекса.
+  downloadFormat: 'best',
   downloadLyrics: true,
   downloadCover: true,
   // Альбом и плейлист складывать в свою папку или всё в общую.
@@ -232,6 +234,13 @@ function load() {
     migrated = true;
   }
 
+  // Раньше был один выключатель «Скачивать в MP3» — стал выбором формата.
+  if (typeof values.downloadMp3 === 'boolean') {
+    values.downloadFormat = values.downloadMp3 ? 'mp3' : 'best';
+    migrated = true;
+  }
+
+  delete values.downloadMp3;
   delete values.streamLight;
   delete values.miniplayerHotkey;
   delete values.useLibrary;

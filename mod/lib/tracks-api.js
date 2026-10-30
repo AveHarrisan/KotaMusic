@@ -18,9 +18,20 @@ const SIGN_SECRET = 'kzqU4XhfCaY6B6JTHODeq5';
 
 // Порядок важен: сервер отдаёт лучший из перечисленных.
 const CODECS = ['flac', 'aac', 'he-aac', 'mp3', 'flac-mp4', 'aac-mp4', 'he-aac-mp4'];
-// raw — файл отдаётся как есть; encraw был бы зашифрован, и ключ
-// пришлось бы применять самим без всякой пользы.
-const TRANSPORTS = ['raw'];
+
+// Кодеки под каждый формат скачивания.
+const FORMAT_CODECS = {
+  best: CODECS,
+  m4a: ['aac-mp4', 'aac', 'he-aac-mp4', 'he-aac'],
+  mp3: ['mp3'],
+};
+
+// ⚠️Лучшее качество Яндекс отдаёт в основном зашифрованным (encraw): с
+// одним raw для многих треков приходил запасной AAC 192 кбит/с, хотя у
+// человека Плюс. Клиент сам просит encraw — и мы так же; ключ приходит
+// в том же ответе, расшифровка — в downloads.js. raw — запасной путь.
+const TRANSPORTS = ['encraw'];
+const FALLBACK_TRANSPORTS = ['raw'];
 
 // Запросов за раз: столько же берёт сам клиент.
 const BATCH = 50;
@@ -113,8 +124,20 @@ async function tracksMeta(ids) {
 const ts = () => Math.floor(Date.now() / 1000);
 
 /** Ссылка на файл одного трека. */
-async function fileInfo(trackId, { mp3 = false, quality: wanted = null } = {}) {
-  const codecs = mp3 ? ['mp3'] : CODECS;
+async function fileInfo(trackId, { format = 'best', quality: wanted = null } = {}) {
+  try {
+    const info = await fileInfoVia(trackId, { format, wanted, transports: TRANSPORTS });
+    if (info?.url) return info;
+  } catch (e) {
+    log.debug('Зашифрованной ссылки нет, прошу открытую:', e.message);
+  }
+
+  return fileInfoVia(trackId, { format, wanted, transports: FALLBACK_TRANSPORTS });
+}
+
+async function fileInfoVia(trackId, { format, wanted, transports }) {
+  const mp3 = format === 'mp3';
+  const codecs = FORMAT_CODECS[format] || CODECS;
   const stamp = ts();
 
   // Качество: либо выбранное человеком в клиенте, либо лучшее из
@@ -130,8 +153,8 @@ async function fileInfo(trackId, { mp3 = false, quality: wanted = null } = {}) {
     ts: String(stamp),
     quality,
     codecs: codecs.join(','),
-    transports: TRANSPORTS.join(','),
-    sign: sign(`${stamp}${trackId}${quality}${codecs.join('')}${TRANSPORTS.join('')}`),
+    transports: transports.join(','),
+    sign: sign(`${stamp}${trackId}${quality}${codecs.join('')}${transports.join('')}`),
   });
 
   const data = await request(`get-file-info?${params}`);
@@ -139,9 +162,9 @@ async function fileInfo(trackId, { mp3 = false, quality: wanted = null } = {}) {
 }
 
 /** Ссылки на файлы пачкой — так же, как это делает клиент. */
-async function fileInfoBatch(ids, { mp3 = false } = {}) {
-  const codecs = mp3 ? ['mp3'] : CODECS;
-  const quality = mp3 ? 'nq' : 'lossless';
+async function fileInfoBatch(ids, { format = 'best' } = {}) {
+  const codecs = FORMAT_CODECS[format] || CODECS;
+  const quality = format === 'mp3' ? 'nq' : 'lossless';
   const out = [];
 
   for (let i = 0; i < ids.length; i += BATCH) {
