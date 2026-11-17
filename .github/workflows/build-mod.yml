@@ -57,33 +57,17 @@ jobs:
           echo "client=$(node -p "require('./dist/build-info.json').clientVersion")" >> $GITHUB_OUTPUT
           echo "mod=$(node -p "require('./dist/build-info.json').modVersion")" >> $GITHUB_OUTPUT
 
-      # Описание релиза собираем файлом: список правок берём из
-      # CHANGELOG.md, а если раздела для этой версии там нет — обходимся
-      # без него, сборку это ронять не должно.
+      # Сверяем версию мода с предыдущим клиентом: при той же версии
+      # описываем только обновление Яндекс Музыки, включая notes для клиента.
       - name: Собрать описание релиза
         env:
-          CLIENT: ${{ steps.info.outputs.client }}
-          MOD: ${{ steps.info.outputs.mod }}
-        run: |
-          {
-            echo "Собрано автоматически для клиента **$CLIENT**, версия мода **$MOD**."
-            echo
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-description.js
 
-            if notes=$(node scripts/changelog.js "$MOD"); then
-              echo "### Что изменилось"
-              echo
-              echo "$notes"
-              echo
-            else
-              echo "В CHANGELOG.md нет раздела для версии $MOD." >&2
-            fi
-
-            echo "Первая установка — через установщик KotaMusic: одной подмены файла"
-            echo "мало, Windows и macOS проверяют целостность \`app.asar\`. Дальше мод"
-            echo "обновляет себя сам."
-          } > release-body.md
-
-          cat release-body.md
+      - name: Собрать описание релиза
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-description.js
 
       # Релиз на версию клиента один, но сам мод внутри него обновляется:
       # сверяем версию мода в выложенном build-info.json с собранной.

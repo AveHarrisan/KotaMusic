@@ -67,38 +67,6 @@ async function waitForExit() {
   return false;
 }
 
-/**
- * Готовит файл с проверкой целостности к правке.
- *
- * Этот сценарий запущен самим клиентом (его Electron в режиме Node),
- * поэтому его исполняемый файл занят нами же и перезаписать его нельзя.
- * Windows при этом разрешает такой файл переименовать: уводим занятый
- * в сторону и правим уже свежую копию под прежним именем.
- */
-function freeForWrite(file) {
-  try {
-    const fd = fs.openSync(file, 'r+');
-    fs.closeSync(fd);
-    return true;
-  } catch {}
-
-  const moved = `${file}.old`;
-
-  try {
-    if (fs.existsSync(moved)) fs.unlinkSync(moved);
-  } catch {}
-
-  try {
-    fs.renameSync(file, moved);
-    fs.copyFileSync(moved, file);
-    log('занятый файл уведён в', moved);
-    return true;
-  } catch (e) {
-    log('освободить файл не вышло:', e.message);
-    return false;
-  }
-}
-
 /** Файл освобождается позже самого процесса — пробуем, пока не выйдет. */
 async function replace() {
   for (let i = 0; i < 30; i += 1) {
@@ -187,16 +155,12 @@ async function main() {
     }
   }
 
-  if (!freeForWrite(integrityTarget)) {
-    log('файл целостности занят, обновление отменено');
-    launch();
-    return;
-  }
-
   const backup = `${target}.before-update`;
+  const integrityBackup = `${integrityTarget}.before-update`;
 
   try {
     fs.copyFileSync(target, backup);
+    fs.copyFileSync(integrityTarget, integrityBackup);
   } catch (e) {
     log('не удалось сделать копию:', e.message);
     return;
@@ -210,24 +174,42 @@ async function main() {
     return;
   }
 
+  // Исправляем отдельную копию до замены exe. Краткая блокировка
+  // антивирусом после установки не должна оставлять клиент без мода.
+  const staged = `${integrityTarget}.kotamusic-${Date.now()}`;
   try {
-    const result = patchIntegrity(integrityTarget, target);
+    fs.copyFileSync(integrityTarget, staged);
+    const result = patchIntegrity(staged, target);
+    let installed = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      try {
+        fs.copyFileSync(staged, integrityTarget);
+        installed = true;
+        break;
+      } catch (e) {
+        log('файл целостности занят, повторяю:', e.message);
+        await sleep(1000);
+      }
+    }
+    if (!installed) throw new Error('Не удалось заменить файл целостности за 30 попыток');
+    // Повторное чтение подтверждает соответствие exe установленному архиву.
+    const verified = patchIntegrity(integrityTarget, target);
+    if (verified.patched) throw new Error('Файл целостности изменился во время обновления');
     log('проверка целостности:', JSON.stringify(result));
   } catch (e) {
     log('целостность не обновилась, возвращаю прежний архив:', e.message);
-    fs.copyFileSync(backup, target);
-    return;
+    // Возвращаем согласованную пару, если запись exe успела начаться.
+    try {
+      fs.copyFileSync(integrityBackup, integrityTarget);
+    } finally {
+      fs.copyFileSync(backup, target);
+    }
+    throw e;
   }
 
   log('готово, запускаю клиент');
 
   launch();
-
-  // Копия занятого файла больше не нужна, но удалить её получится только
-  // когда этот процесс закончится — пробуем при следующем обновлении.
-  try {
-    fs.unlinkSync(`${integrityTarget}.old`);
-  } catch {}
 }
 
 main().catch((e) => log('ошибка:', e.stack || e.message));

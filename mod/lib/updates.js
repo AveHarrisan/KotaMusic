@@ -179,6 +179,11 @@ async function apply(update, onProgress) {
   }
   const { asar, integrity, executable } = targets();
   const script = prepareUpdater();
+  // Сценарий не должен работать из exe, целостность которого он меняет.
+  // Отдельное имя также переживает taskkill установщика клиента.
+  const runtime = process.platform === 'win32'
+    ? path.join(path.dirname(executable), `kotamusic-updater-${Date.now()}.exe`)
+    : process.execPath;
 
   log.info(`Обновляюсь до ${update.tag}: ${source} → ${asar}`);
 
@@ -200,8 +205,10 @@ async function apply(update, onProgress) {
         'timeout /t 5 /nobreak >nul',
         'taskkill /IM "%~nx1" /F >nul 2>&1',
         'timeout /t 3 /nobreak >nul',
+        `copy /Y "${executable}" "${runtime}" >nul`,
+        'if errorlevel 1 exit /b 1',
         'set ELECTRON_RUN_AS_NODE=1',
-        `"${executable}" "${script}" "${source}" "${asar}" "${integrity}" "${executable}" 0 refresh-backup`,
+        `"${runtime}" "${script}" "${source}" "${asar}" "${integrity}" "${executable}" 0 refresh-backup`,
         '',
       ].join('\r\n'),
       'utf8'
@@ -212,8 +219,9 @@ async function apply(update, onProgress) {
       stdio: 'ignore',
     }).unref();
   } else {
+    if (process.platform === 'win32') ofs.copyFileSync(executable, runtime);
     spawn(
-      process.execPath,
+      runtime,
       [script, source, asar, integrity, executable, String(process.pid), clientInstaller],
       {
         detached: true,
