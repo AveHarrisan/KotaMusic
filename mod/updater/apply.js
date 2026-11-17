@@ -176,7 +176,8 @@ async function main() {
 
   // Исправляем отдельную копию до замены exe. Краткая блокировка
   // антивирусом после установки не должна оставлять клиент без мода.
-  const staged = `${integrityTarget}.kotamusic-${Date.now()}`;
+  const staged = path.join(path.dirname(integrityTarget),
+    `.kotamusic-${Date.now()}-${path.basename(integrityTarget)}`);
   try {
     fs.copyFileSync(integrityTarget, staged);
     const result = patchIntegrity(staged, target);
